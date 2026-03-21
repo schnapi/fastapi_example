@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:latest # Pre-built image
+    environment:
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+  api:
+    build: .            # Tells Compose to use your Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db              # Ensures DB starts before Python
+    environment:
+      DATABASE_URL: postgres://postgres:password@db:5432/postgres
+
+volumes:
+  pgdata:
