@@ -11,6 +11,13 @@ class Settings(BaseSettings):
     debug: bool = False
     secret_key: str = "defaultsecret"
 
+    # CORS - Allow Vite dev server in development
+    allowed_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost",
+        "http://127.0.0.1",
+    ]
+
     class Config:
         env_file = ".env"
         extra = "forbid"

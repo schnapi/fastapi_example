@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from oxyde import db
 from oxyde_admin import FastAPIAdmin
 
@@ -18,6 +19,14 @@ app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])
 app.mount("/admin", admin.app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # from oxyde.db import transaction
 
