@@ -14,7 +14,7 @@ FROM python:3.13-slim
 WORKDIR /app
 # Copy only the installed packages from the builder
 COPY --from=builder /install /usr/local
-COPY ./app /app
+COPY . /app
 
 # Run as a non-root user (2026 Security Standard)
 RUN useradd -m myuser

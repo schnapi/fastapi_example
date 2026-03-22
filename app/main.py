@@ -2,11 +2,17 @@ from fastapi import FastAPI
 from oxyde import db
 from oxyde_admin import FastAPIAdmin
 
-from oxyde_config import DATABASES
-from .models import User
+from app.models import User
+from app.config import settings
+
+# Enable debugpy in development
+if settings.debug:
+    from app.debugger import enable_debugpy
+
+    enable_debugpy()
 
 
-app = FastAPI(lifespan=db.lifespan(default=DATABASES["default"]))
+app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])
 app.mount("/admin", admin.app)

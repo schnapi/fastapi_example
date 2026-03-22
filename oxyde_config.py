@@ -1,5 +1,7 @@
 """Oxyde ORM configuration."""
 
+from app.config import settings
+
 # List of Python modules containing Model classes
 MODELS = ["app.models"]
 
@@ -12,5 +14,5 @@ MIGRATIONS_DIR = "migrations"
 # Database connections
 # Keys are connection aliases, values are connection URLs
 DATABASES = {
-    "default": "postgresql://postgres:password@db:5432/postgres",
+    "default": settings.database_url,
 }

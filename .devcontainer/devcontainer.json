@@ -20,8 +20,9 @@
   "forwardPorts": [
     8000
   ],
-  "remoteUser": "root",
+  "remoteUser": "myuser",
   "runArgs": [
     "--network=fastapi_default"
-  ]
+  ],
+  "workspaceFolder": "/app"
 }

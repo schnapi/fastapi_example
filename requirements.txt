@@ -1,5 +1,8 @@
 fastapi[standard]
 uvicorn
+gunicorn
 # psycopg2-binary
 oxyde
 oxyde-admin
+pydantic_settings
+debugpy
