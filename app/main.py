@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from oxyde import db
 from oxyde_admin import FastAPIAdmin
@@ -41,5 +43,10 @@ def read_root():
 
 
 @app.get("/items/{item_id}")
-def read_item(item_id: int, q: str = None):
+def read_item(item_id: int, q: str | None = None):
     return {"item_id": item_id, "q": q}
+
+
+@app.get("/health/")
+def health():
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
