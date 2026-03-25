@@ -6,3 +6,8 @@ oxyde
 oxyde-admin
 pydantic_settings
 debugpy
+httpx
+redis
+slowapi
+tenacity
+aiocache
