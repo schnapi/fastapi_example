@@ -1,7 +1,7 @@
 from httpx import AsyncClient
 from typing import AsyncGenerator
 
-from .redis_utils import RedisClient, get_redis_client
+from app.utils.redis_utils import RedisClient, get_redis_client
 
 
 def redis_dependency() -> RedisClient:

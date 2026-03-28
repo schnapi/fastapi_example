@@ -3,7 +3,7 @@ from fastapi import Depends, HTTPException, Request
 import httpx
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 
-from app.dependencies import get_redis_client, get_http_client, RedisClient
+from app.api.dependencies import redis_dependency, get_http_client, RedisClient
 from app.models import User
 from . import app, limiter
 
@@ -55,7 +55,7 @@ async def get_stock(
     request: Request,
     symbol: str,
     client: AsyncClient = Depends(get_http_client),
-    redis_client: RedisClient = Depends(get_redis_client),
+    redis_client: RedisClient = Depends(redis_dependency),
 ):
     cache_key = f"stock:{symbol}"
 

@@ -5,7 +5,7 @@ from app.services.auth_service import authenticate_user, create_access_token
 router = APIRouter()
 
 
-@router.post("/auth/login")
+@router.post("/login")
 async def login(payload: dict):
     user = await authenticate_user(
         username=payload["username"],

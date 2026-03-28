@@ -6,7 +6,7 @@ from app.models import User
 router = APIRouter()
 
 
-@router.post("/users")
+@router.post("/")
 async def register_user(payload: dict):
     """
     Using raw dict instead of schema (Oxyde handles validation).
@@ -25,7 +25,7 @@ async def register_user(payload: dict):
     }
 
 
-@router.get("/users/{user_id}")
+@router.get("/{user_id}")
 async def get_user(user_id: int):
     user = await User.get_or_none(id=user_id)
 

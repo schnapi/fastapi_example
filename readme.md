@@ -11,5 +11,4 @@
 # Implemented
 - rate limiter with xginx and slowapi
 - redis cache
-- TODO from fastapi import BackgroundTasks
 - TODO add async logs QueueHandler, RotatingFileHandler,

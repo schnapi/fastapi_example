@@ -1,6 +1,6 @@
 from fastapi import Depends, APIRouter
 
-from app.dependencies import get_redis_client, RedisClient
+from app.api.dependencies import redis_dependency, RedisClient
 from app.services.websocket_manager import (
     WebSocketManager,
     WebSocket,
@@ -25,7 +25,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
 async def task_ws(
     websocket: WebSocket,
     task_id: str,
-    redis_client: RedisClient = Depends(get_redis_client),
+    redis_client: RedisClient = Depends(redis_dependency),
 ):
     await websocket.accept()
     pubsub = redis_client.async_client.pubsub()

@@ -10,15 +10,15 @@ from slowapi import Limiter
 from oxyde import db
 from oxyde_admin import FastAPIAdmin
 
-from app.redis_utils import get_redis_client
+from app.utils.redis_utils import get_redis_client
 from app.config import settings
 from app.models import User
-from app.rate_limit_utils import user_key
+from app.utils.rate_limit_utils import user_key
 from app.api.router import api_router
 
 # Enable debugpy in development
 if settings.debug:
-    from app.debugger import enable_debugpy
+    from app.utils.debugger import enable_debugpy
 
     enable_debugpy()
 

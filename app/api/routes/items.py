@@ -19,11 +19,11 @@ class ItemCreate(BaseModel):
 router = APIRouter()
 
 
-@router.get("/users/{user_id}/items", response_model=list[ItemOut])
+@router.get("/", response_model=list[ItemOut])
 def read_user_items(user_id: int):
     return get_items_by_user(user_id)
 
 
-@router.post("/users/{user_id}/items", response_model=ItemOut)
+@router.post("/", response_model=ItemOut)
 def create_user_item(user_id: int, item: ItemCreate):
     return create_item_for_user(user_id, item)
