@@ -1,39 +1,42 @@
-# app/api/routes/users.py
 from fastapi import APIRouter, HTTPException
-from app.services.user_service import create_user
+from pydantic import BaseModel
+
+# from app.services.user_service import create_user
 from app.models import User
+from app.utils import crud_utils
 
 router = APIRouter()
 
 
-@router.post("/")
-async def register_user(payload: dict):
-    """
-    Using raw dict instead of schema (Oxyde handles validation).
-    """
-    user = await create_user(
-        username=payload["username"],
-        email=payload["email"],
-        password=payload["password"],
+# --- Schemas ---
+class UserCreate(BaseModel):
+    name: str
+    email: str
+
+
+@router.get("/")
+async def list_users():
+    return await User.objects.all()
+
+
+@router.get("/{id}")
+async def get_user(id: int):
+    return await crud_utils.get_or_404(User, id=id)
+
+
+@router.post("/", status_code=201)
+async def create_user(data: UserCreate):
+    return await crud_utils.create_safe(User, data=data.model_dump())
+
+
+@router.patch("/{id}")
+async def update_user(id: int, data: UserCreate):
+    users = await crud_utils.update_safe(
+        User.objects.filter(id=id), dict(name=data.name, email=data.email)
     )
-
-    # Manual serialization (since no schemas)
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-    }
+    return users[0] if users else HTTPException(404, "User not found")
 
 
-@router.get("/{user_id}")
-async def get_user(user_id: int):
-    user = await User.get_or_none(id=user_id)
-
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-    }
+@router.delete("/{id}", status_code=204)
+async def delete_user(id: int):
+    _count = await crud_utils.delete_safe(User.objects.filter(id=id))
