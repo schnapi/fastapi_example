@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
 import httpx
-import redis.asyncio as redis
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
 
-from app.dependencies import get_redis_client, get_http_client, AsyncClient
+from app.dependencies import get_redis_client, get_http_client, RedisClient
 from app.models import User
 from . import app, limiter
 
@@ -56,12 +55,12 @@ async def get_stock(
     request: Request,
     symbol: str,
     client: AsyncClient = Depends(get_http_client),
-    redis_client: redis.Redis = Depends(get_redis_client),
+    redis_client: RedisClient = Depends(get_redis_client),
 ):
     cache_key = f"stock:{symbol}"
 
     # 1. Try cache
-    cached = await redis_client.get(cache_key)
+    cached = await redis_client.async_client.get(cache_key)
     if cached:
         return {"symbol": symbol.upper(), "price": float(cached), "source": "cache"}
 
@@ -69,7 +68,7 @@ async def get_stock(
     price = await fetch_stock_price(symbol, client)
 
     # 3. Store in Redis (TTL = 10s)
-    await redis_client.set(cache_key, price, ex=10)
+    await redis_client.async_set(cache_key, price, ex=10)
 
     return {"symbol": symbol.upper(), "price": price, "source": "api"}
 

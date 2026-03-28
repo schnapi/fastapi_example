@@ -14,6 +14,7 @@ from app.redis_utils import get_redis_client
 from app.config import settings
 from app.models import User
 from app.rate_limit_utils import user_key
+from app.api.router import api_router
 
 # Enable debugpy in development
 if settings.debug:
@@ -25,9 +26,10 @@ redis_client = get_redis_client()
 
 
 app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
+app.include_router(api_router)
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])
-app.mount("/admin", admin.app) # type: ignore
+app.mount("/admin", admin.app)  # type: ignore
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,

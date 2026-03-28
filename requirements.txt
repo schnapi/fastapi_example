@@ -12,3 +12,4 @@ slowapi
 tenacity
 aiocache
 python-jose[cryptography]
+passlib

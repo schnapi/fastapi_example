@@ -52,8 +52,8 @@ class RedisClient:
     def client(self) -> redis.Redis:
         return self._sync_client
 
-    def set(self, key: str, value: str, expire: Optional[int] = None):
-        self._sync_client.set(key, value, ex=expire or self.default_ttl)
+    def set(self, key: str, value: str, ex: Optional[int] = None):
+        self._sync_client.set(key, value, ex=ex or self.default_ttl)
 
     def get(self, key: str) -> Optional[str]:
         return self._sync_client.get(key)
@@ -66,8 +66,8 @@ class RedisClient:
     def async_client(self) -> redis_async.Redis:
         return self._async_client
 
-    async def async_set(self, key: str, value: str, expire: Optional[int] = None):
-        await self._async_client.set(key, value, ex=expire or self.default_ttl)
+    async def async_set(self, key: str, value: str, ex: Optional[int] = None):
+        await self._async_client.set(key, value, ex=ex or self.default_ttl)
 
     async def async_get(self, key: str) -> Optional[str]:
         return await self._async_client.get(key)
