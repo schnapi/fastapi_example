@@ -1,10 +1,11 @@
-from slowapi.errors import RateLimitExceeded
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from slowapi import Limiter
 from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter
 
 from oxyde import db
 from oxyde_admin import FastAPIAdmin
@@ -20,14 +21,13 @@ if settings.debug:
 
     enable_debugpy()
 
-app = FastAPI(title="MyApp")
 redis_client = get_redis_client()
 
 
 app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])
-app.mount("/admin", admin.app)
+app.mount("/admin", admin.app) # type: ignore
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -42,7 +42,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return HTTPException(status_code=429, detail="Rate limit exceeded")
+    return JSONResponse(status_code=429, content={"error": "Rate limit exceeded"})
 
 
 @app.on_event("startup")

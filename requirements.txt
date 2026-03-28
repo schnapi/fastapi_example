@@ -11,3 +11,4 @@ redis
 slowapi
 tenacity
 aiocache
+python-jose[cryptography]

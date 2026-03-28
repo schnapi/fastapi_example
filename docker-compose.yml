@@ -15,7 +15,7 @@ services:
       - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
 
@@ -28,7 +28,9 @@ services:
         echo 'Waiting for database...';
         sleep 2;
       done;
-      gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000
+      gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 \
+      --access-logfile /dev/null \
+      --error-logfile /app/logs/error.log
       "
     volumes:
       - static_volume:/app/staticfiles
@@ -48,10 +50,10 @@ services:
         max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 30s
 
   frontend:
     build:
@@ -92,11 +94,11 @@ services:
       - internal
       - public
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/health || exit 1"]
-      interval: 10s
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 60s
       timeout: 5s
+      start_period: 15s
       retries: 3
-      start_period: 10s
     logging:
       driver: "json-file"
       options:

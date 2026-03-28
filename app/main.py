@@ -2,10 +2,10 @@ from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
 import httpx
 import redis.asyncio as redis
-
-from dependencies import get_redis_client, get_http_client, AsyncClient
-from app.models import User
 from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+
+from app.dependencies import get_redis_client, get_http_client, AsyncClient
+from app.models import User
 from . import app, limiter
 
 STOCK_API_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
@@ -104,4 +104,5 @@ def read_item(item_id: int, q: str | None = None):
 
 @app.get("/health/")
 def health():
+    # Just return HTTP 200 if app is alive and DB connection works.
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
