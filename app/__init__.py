@@ -15,6 +15,8 @@ from app.config import settings
 from app.models import User
 from app.utils.rate_limit_utils import user_key
 from app.api.router import api_router
+from app import resilience  # noqa: F401 # needed to register resilience decorators
+from app.metrics import metrics_middleware
 
 # Enable debugpy in development
 if settings.debug:
@@ -23,7 +25,6 @@ if settings.debug:
     enable_debugpy()
 
 redis_client = get_redis_client()
-
 
 app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
 app.include_router(api_router)
@@ -40,6 +41,7 @@ app.add_middleware(
 limiter = Limiter(key_func=user_key, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
+app.middleware("http")(metrics_middleware)
 
 
 @app.exception_handler(RateLimitExceeded)

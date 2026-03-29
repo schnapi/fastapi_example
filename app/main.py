@@ -1,30 +1,30 @@
 from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
-import httpx
-from tenacity import retry, stop_after_attempt, wait_fixed, RetryError
+from httpx import AsyncClient
 
 from app.api.dependencies import redis_dependency, get_http_client, RedisClient
 from app.models import User
+from app.resilience import resilience
 from . import app, limiter
 
 STOCK_API_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
 
 
-# Retry decorator: 3 attempts, 2 seconds apart
-@retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-def call_external_service():
-    response = httpx.get("https://example.com/api")
+# Retry decorator: 3 attempts, 2 seconds apart. Circuit breaker: opens after 3 failures, recovers after 10 seconds.
+@resilience.decorate
+async def call_external_service(client: AsyncClient):
+    response = client.get("https://example.com/api")
     if response.status_code != 200:
         raise Exception("Service failed")
     return response.json()
 
 
 @app.get("/data")
-def get_data():
+async def get_data(client: AsyncClient = Depends(get_http_client)):
     try:
-        return call_external_service()
-    except RetryError:
-        raise HTTPException(status_code=503, detail="External service unavailable")
+        return await call_external_service(client)
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 async def fetch_stock_price(symbol: str, client: AsyncClient) -> float:
@@ -47,9 +47,7 @@ async def fetch_stock_price(symbol: str, client: AsyncClient) -> float:
 
 @app.get("/stock/{symbol}")
 # @limiter.limit("10/minute")
-@limiter.limit(
-    "5/second",
-)
+@limiter.limit("5/second")
 @limiter.limit("100/minute")
 async def get_stock(
     request: Request,

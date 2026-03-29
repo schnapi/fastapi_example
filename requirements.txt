@@ -9,7 +9,8 @@ debugpy
 httpx
 redis
 slowapi
-tenacity
+pyresilience
 aiocache
 python-jose[cryptography]
 passlib
+prometheus_client
