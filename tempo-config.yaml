@@ -1,0 +1,18 @@
+# tempo.yaml for Tempo v2.10.x
+
+server:
+  http_listen_port: 3200 # HTTP query frontend
+  grpc_listen_port: 9095 # gRPC / OTLP ingestion
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+        http:
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /tempo-data # path inside container or volume mount

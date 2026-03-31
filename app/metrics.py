@@ -1,16 +1,20 @@
 import time
+import logging
+import uuid
+from fastapi import Request
 import httpx
 from prometheus_client import Counter, Histogram
-from fastapi import Request
 
-# Metrics for outgoing calls
+logger = logging.getLogger("metrics")
+
+# Outgoing requests
 OUTGOING_HTTP_REQUESTS = Counter(
     "http_requests_total", "Total outgoing HTTP requests", ["method", "endpoint", "status_code"]
 )
 OUTGOING_HTTP_LATENCY = Histogram(
     "http_request_latency_seconds", "Latency of outgoing HTTP requests", ["method", "endpoint"]
 )
-# Incoming traffic metrics
+# Incoming requests
 INCOMING_REQUESTS = Counter(
     "incoming_requests_total", "Total incoming HTTP requests", ["method", "endpoint", "status_code"]
 )
@@ -19,31 +23,101 @@ INCOMING_LATENCY = Histogram(
 )
 
 
-# Wrapper for outgoing HTTP requests
-async def tracked_request(method, url, **kwargs):
+async def tracked_request(method, url, request_id=None, **kwargs):
     start = time.time()
-    async with httpx.AsyncClient() as client:
-        response = await client.request(method, url, **kwargs)
-    elapsed = time.time() - start
+    is_log_info = logger.isEnabledFor(logging.INFO)
+    if is_log_info:
+        logger.info(f"Outgoing request: {method} {url}")
 
-    OUTGOING_HTTP_REQUESTS.labels(
-        method=method, endpoint=url, status_code=response.status_code
-    ).inc()
-    OUTGOING_HTTP_LATENCY.labels(method=method, endpoint=url).observe(elapsed)
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.request(method, url, **kwargs)
+        elapsed = time.time() - start
+        status_code = response.status_code
 
-    return response
+        OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code=status_code).inc()
+        OUTGOING_HTTP_LATENCY.labels(method=method, endpoint=url).observe(elapsed)
+        if is_log_info:
+            logger.info(
+                f"Outgoing response: {method} {url} status={status_code} duration={elapsed:.3f}s"
+            )
+        if status_code >= 500 or elapsed > 2.0:
+            logger.warning(
+                "Slow external call",
+                extra={
+                    "request_id": request_id,
+                    "method": method,
+                    "endpoint": url,
+                    "status_code": status_code,
+                    "duration": round(elapsed, 3),
+                },
+            )
+        return response
+    except Exception:
+        elapsed = time.time() - start
+        logger.error(
+            "External request failed",
+            extra={
+                "request_id": request_id,
+                "method": method,
+                "endpoint": url,
+                "duration": round(elapsed, 3),
+                # "exception": str(e),
+            },
+            exc_info=True,  # includes full traceback in logs
+        )
+        OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code="error").inc()
+        raise
 
 
 # Middleware function (not yet attached to app)
 async def metrics_middleware(request: Request, call_next):
-    start = time.time()
-    response = await call_next(request)
-    elapsed = time.time() - start
-
+    method = request.method
     endpoint = request.url.path
-    INCOMING_REQUESTS.labels(
-        method=request.method, endpoint=endpoint, status_code=response.status_code
-    ).inc()
-    INCOMING_LATENCY.labels(method=request.method, endpoint=endpoint).observe(elapsed)
 
+    # Generate request ID
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    start = time.time()
+    is_log_info = logger.isEnabledFor(logging.INFO)
+    if is_log_info:
+        logger.info(f"Incoming request: {method} {endpoint}")
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        logger.error(
+            "Unhandled request error",
+            extra={
+                "request_id": request_id,
+                "method": method,
+                "endpoint": endpoint,
+                # "exception": str(e),
+            },
+            exc_info=True,  # includes full traceback in logs
+        )
+        raise
+
+    elapsed = time.time() - start
+    status_code = response.status_code
+    # Metrics
+    INCOMING_REQUESTS.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
+    INCOMING_LATENCY.labels(method=method, endpoint=endpoint).observe(elapsed)
+    # Info logs (dev only)
+    if is_log_info:
+        logger.info(
+            f"Completed request: {method} {endpoint} status={status_code} duration={elapsed:.3f}s"
+        )
+    # Production logs (important signals)
+    if status_code >= 500 or elapsed > 2.0:
+        logger.warning(
+            "Slow or failing request",
+            extra={
+                "request_id": request_id,
+                "method": method,
+                "endpoint": endpoint,
+                "status_code": status_code,
+                "duration": round(elapsed, 3),
+            },
+        )
     return response

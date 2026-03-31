@@ -29,9 +29,7 @@ services:
         sleep 2;
       done;
       gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 \
-      --access-logfile /dev/null \
-      --error-logfile /app/logs/error.log
-      "
+      --access-logfile - --error-logfile -"
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -39,6 +37,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
+      loki:
+        condition: service_started
     env_file:
       - .env
     networks:
@@ -72,6 +74,106 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel_collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  tempo:
+    image: grafana/tempo:2.10.3
+    container_name: tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200"   # HTTP query frontend
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - ./tempo-data:/tempo-data
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: -config.file=/etc/loki-config.yaml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki-config.yaml
+      - ./loki-data/wal:/wal
+      - ./loki-data/chunks:/tmp/loki/chunks
+      - ./loki-data/cache:/tmp/loki/cache
+      - ./loki-data/index:/tmp/loki/index
+      - ./loki-data/compactor:/var/loki
+    networks:
+      - internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - internal
+    depends_on:
+      - loki
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - tempo
+      - loki
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./provisioning/dashboards:/etc/grafana/dashboards  # dashboards provisioning
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
 
   nginx:
     image: nginx:1.29.6
@@ -111,6 +213,7 @@ volumes:
   media_volume:
   logs_volume:
   frontend_dist:
+  grafana_data:
 
 networks:
   internal:

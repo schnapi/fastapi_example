@@ -17,16 +17,21 @@ from app.utils.rate_limit_utils import user_key
 from app.api.router import api_router
 from app import resilience  # noqa: F401 # needed to register resilience decorators
 from app.metrics import metrics_middleware
+from app.tracing import init_observability
 
+# from app.logging_config import setup_logging
 # Enable debugpy in development
 if settings.debug:
     from app.utils.debugger import enable_debugpy
 
     enable_debugpy()
 
+# log_listener = setup_logging()
+
 redis_client = get_redis_client()
 
 app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
+tracer = init_observability(app)
 app.include_router(api_router)
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])

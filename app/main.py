@@ -1,17 +1,21 @@
 from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Request
 from httpx import AsyncClient
+import logging
 
 from app.api.dependencies import redis_dependency, get_http_client, RedisClient
 from app.models import User
-from app.resilience import resilience
+from app.resilience import registry
 from . import app, limiter
+
+# Configure logger
+logger = logging.getLogger("my-fastapi-app")
 
 STOCK_API_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
 
 
 # Retry decorator: 3 attempts, 2 seconds apart. Circuit breaker: opens after 3 failures, recovers after 10 seconds.
-@resilience.decorate
+@registry.decorator("default")
 async def call_external_service(client: AsyncClient):
     response = client.get("https://example.com/api")
     if response.status_code != 200:
@@ -66,7 +70,7 @@ async def get_stock(
     price = await fetch_stock_price(symbol, client)
 
     # 3. Store in Redis (TTL = 10s)
-    await redis_client.async_set(cache_key, price, ex=10)
+    await redis_client.async_set(cache_key, str(price), ex=10)
 
     return {"symbol": symbol.upper(), "price": price, "source": "api"}
 
@@ -91,7 +95,8 @@ async def create_user(user: User):
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello, World!"}
+    logger.info("Root endpoint was called")
+    return {"message": "Hello, World1!"}
 
 
 @app.get("/items/{item_id}")

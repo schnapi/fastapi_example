@@ -10,4 +10,4 @@ api_router.include_router(auth.router, prefix="/auth")
 api_router.include_router(websockets.router)  # WebSocket endpoints
 
 metrics_app = make_asgi_app()
-api_router.include_router(metrics_app, prefix="/metrics")
+api_router.mount("/metrics", metrics_app)

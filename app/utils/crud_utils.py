@@ -3,10 +3,12 @@ from fastapi import HTTPException
 from oxyde.models import Model
 from oxyde.exceptions import (
     IntegrityError,
-    DatabaseError,
-    ValidationError,
-    DoesNotExist,
+    ManagerError,
+    FieldError,
+    FieldLookupError,
+    NotFoundError,
 )
+from oxyde.queries.manager import QueryManager
 
 
 def get_model_name(target):
@@ -29,9 +31,9 @@ async def create_safe(model_class, data: dict):
         raise HTTPException(
             status_code=409, detail=f"{model_class.__name__} already exists"
         )
-    except ValidationError as e:
+    except (FieldError, FieldLookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except DatabaseError as e:
+    except ManagerError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -42,11 +44,11 @@ async def get_or_404(model_class, **filters):
     """
     try:
         return await model_class.objects.get(**filters)
-    except DoesNotExist:
+    except NotFoundError:
         raise HTTPException(status_code=404, detail=f"{model_class.__name__} not found")
 
 
-async def update_safe(target: Union[Model, "QuerySet"], data: dict):
+async def update_safe(target: Union[Model, QueryManager], data: dict):
     """
     Generic update helper for Oxyde ORM.
     Handles validation and unique constraint conflicts.
@@ -54,7 +56,7 @@ async def update_safe(target: Union[Model, "QuerySet"], data: dict):
     """
     model_name = get_model_name(target)
     try:
-        if hasattr(target, "update") and callable(getattr(target, "update")):
+        if isinstance(target, QueryManager):
             return await target.update(**data, returning=True)
         # Single instance update
         else:
@@ -68,15 +70,15 @@ async def update_safe(target: Union[Model, "QuerySet"], data: dict):
             status_code=409,
             detail=f"{model_name} update conflicts with existing data",
         )
-    except ValidationError as e:
+    except (FieldError, FieldLookupError) as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except DatabaseError as e:
+    except ManagerError as e:
         raise HTTPException(
             status_code=500, detail=f"Database error during update: {str(e)}"
         )
 
 
-async def delete_safe(target: Union[Model, "QuerySet"]):
+async def delete_safe(target: Union[Model, QueryManager]):
     """
     Generic delete helper for Oxyde ORM.
     Handles database errors.
@@ -87,5 +89,5 @@ async def delete_safe(target: Union[Model, "QuerySet"]):
             return await target.delete()
         else:
             await target.delete()
-    except DatabaseError as e:
+    except ManagerError as e:
         raise HTTPException(status_code=500, detail=str(e))

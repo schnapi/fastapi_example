@@ -23,4 +23,4 @@ class Settings(BaseSettings):
         extra = "forbid"
 
 
-settings = Settings()
+settings = Settings()  # type: ignore
