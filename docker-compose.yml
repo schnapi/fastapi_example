@@ -177,7 +177,6 @@ services:
     depends_on:
       - tempo
       - loki
-      - alertmanager
     volumes:
       - grafana_data:/var/lib/grafana
       - ./provisioning/dashboards:/etc/grafana/dashboards
@@ -223,26 +222,11 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  alertmanager:
-    image: prom/alertmanager:v0.25.0
-    container_name: alertmanager
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./provisioning/alerting/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-    depends_on:
-      - mailhog
-    networks:
-      - internal
-
   mailhog:
     image: mailhog/mailhog
     platform: linux/amd64
     container_name: mailhog
     ports:
-      - "1025:1025"   # SMTP port for Alertmanager
       - "8025:8025"   # Web UI
     networks:
       - internal
