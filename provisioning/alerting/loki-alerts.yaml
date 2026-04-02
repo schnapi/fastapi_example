@@ -1,0 +1,49 @@
+apiVersion: 1
+groups:
+  - name: API_Health_Alerts
+    interval: 1m # Check the status every minute
+    rules:
+      - uid: api_error_threshold_5_4m
+        title: "API High Error Count (>5 in 4m)"
+        condition: C # Point to the Threshold step
+        for: 2m # Must stay above 5 for 2 minutes to avoid "blips"
+        data:
+          # Step A: The Loki Query
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 600 # 10 minute buffer
+              to: 0
+            datasourceUid: P8E80F9AEF21F6940
+            model:
+              expr: 'sum(count_over_time({service="api"} |= "ERROR" [4m]))'
+              refId: A
+
+          # Step B: The Reduction (Turning Table into Number)
+          - refId: B
+            datasourceUid: "-100"
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+
+          # Step C: The Threshold (Logic check)
+          - refId: C
+            datasourceUid: "-100"
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - type: gt
+                  evaluator:
+                    params: [5] # This is your "> 5" logic
+                  operator:
+                    type: and
+              refId: C
+
+        annotations:
+          summary: "Excessive API Errors Detected"
+          description: "The API has logged {{ $values.B.Value }} errors in the last 4 minutes. Threshold is 5."
+        labels:
+          severity: critical

@@ -1,0 +1,31 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: "default"
+  group_by: ["alertname", "cluster", "service"]
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 4h
+  routes:
+    - receiver: "default"
+      match:
+        severity: "critical"
+      group_wait: 0s
+      repeat_interval: 1h
+
+receivers:
+  - name: "default"
+    email_configs:
+      - to: "test@example.com"
+        from: "alerts@example.com"
+        smarthost: "mailhog:1025"
+        headers:
+          Subject: "Alert: {{ .GroupLabels.alertname }}"
+
+inhibit_rules:
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["alertname", "cluster"]

@@ -5,10 +5,11 @@ services:
       PGOPTIONS: >
         -c log_min_messages=warning
         -c log_min_error_statement=warning
-        -c log_destination=stderr
-        -c logging_collector=on
-        -c log_line_prefix=''
-        -c log_format=json"
+    command: >
+      postgres
+      -c logging_collector=off
+      -c log_destination=jsonlog
+      -c log_line_prefix=''
     restart: unless-stopped
     logging:
       driver: local
@@ -91,6 +92,8 @@ services:
       - "4318:4318"
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      # - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # - /var/run/docker.sock:/var/run/docker.sock:ro # Allow OTel to see container names
     networks:
       - internal
     depends_on:
@@ -102,12 +105,11 @@ services:
         max-size: "10m"
         max-file: "3"
   tempo:
-    image: grafana/tempo:2.3.1
+    image: grafana/tempo:2.9.0
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     ports:
-      - "3200:3200"
-      - "9095:9095"
+      - "3200:3200"   # HTTP frontend
     volumes:
       - ./tempo-data:/tempo-data
       - ./tempo-config.yaml:/etc/tempo.yaml
@@ -140,11 +142,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3100/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   promtail:
     image: grafana/promtail:latest
@@ -162,27 +159,30 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9080/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
   grafana:
-    image: grafana/grafana:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.grafana
     environment:
       - GF_LOG_LEVEL=warn
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      # - GF_SMTP_ENABLED=true
+      # - GF_SMTP_HOST=mailhog:1025
+      # - GF_SMTP_FROM_ADDRESS=alerts@example.com
+      # - GF_SMTP_FROM_NAME=Grafana
     container_name: grafana
     ports:
       - "3000:3000"
     depends_on:
       - tempo
       - loki
+      - alertmanager
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./provisioning/dashboards:/etc/grafana/dashboards  # dashboards provisioning
+      - ./provisioning/dashboards:/etc/grafana/dashboards
       - ./provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./provisioning/alerting:/etc/grafana/provisioning/alerting:ro
     networks:
       - internal
     logging:
@@ -222,6 +222,30 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./provisioning/alerting/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    depends_on:
+      - mailhog
+    networks:
+      - internal
+
+  mailhog:
+    image: mailhog/mailhog
+    platform: linux/amd64
+    container_name: mailhog
+    ports:
+      - "1025:1025"   # SMTP port for Alertmanager
+      - "8025:8025"   # Web UI
+    networks:
+      - internal
 
 volumes:
   pgdata:

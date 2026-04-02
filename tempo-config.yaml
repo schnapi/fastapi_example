@@ -1,8 +1,7 @@
-# tempo.yaml for Tempo v2.10.x
+# tempo.yaml for Tempo v2.9.0
 
 server:
   http_listen_port: 3200 # HTTP query frontend
-  grpc_listen_port: 9095 # gRPC / OTLP ingestion
   log_level: warn # Only warn, error, fatal
   log_format: json
 
@@ -11,10 +10,21 @@ distributor:
     otlp:
       protocols:
         grpc:
+          endpoint: 0.0.0.0:4317
         http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+
+metrics_generator:
+  storage:
+    path: /tempo-data/generator
 
 storage:
   trace:
     backend: local
     local:
-      path: /tempo-data # path inside container or volume mount
+      path: /tempo-data/blocks
+    wal:
+      path: /tempo-data/wal

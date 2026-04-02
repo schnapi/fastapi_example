@@ -94,8 +94,7 @@ async def create_user(user: User):
 
 @app.get("/")
 def read_root():
-    logger.info("test213")
-    logger.error("test213")
+    logger.error("test123")
     logger.warning("Root endpoint was called")
     return {"message": "Hello, World!"}
 

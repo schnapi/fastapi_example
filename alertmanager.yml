@@ -1,0 +1,15 @@
+global:
+  smtp_smarthost: "mailhog:1025"
+  smtp_from: "alertmanager@example.com"
+  smtp_require_tls: false # MailHog doesn’t require TLS
+
+route:
+  receiver: "team-email"
+
+receivers:
+  - name: "team-email"
+    email_configs:
+      - to: "test@example.com"
+        send_resolved: true
+        subject: "{{ .CommonAnnotations.summary }}"
+        html: "{{ .CommonAnnotations.description }}"

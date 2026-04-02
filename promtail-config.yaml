@@ -28,24 +28,24 @@ scrape_configs:
         regex: "(.*)"
         target_label: "job"
         replacement: "docker/${1}"
-    pipeline_stages:
-      # Only process logs from the FastAPI container
-      - match:
-          selector: '{service="api"}'
-          stages:
-            # Parse JSON logs
-            - json:
-                expressions:
-                  timestamp: timestamp
-                  level: level
-                  logger: logger
-                  message: message
-                  request_id: request_id
-                  method: method
-                  endpoint: endpoint
-                  status_code: status_code
-                  duration: duration
-            # Optional: convert timestamp to Loki format
-            - timestamp:
-                source: timestamp
-                format: 2006-01-02T15:04:05
+    # pipeline_stages:
+    #   # Only process logs from the FastAPI container
+    #   - match:
+    #       selector: '{service="api"}'
+    #       stages:
+    #         # Parse JSON logs
+    #         - json:
+    #             expressions:
+    #               timestamp: timestamp
+    #               level: level
+    #               logger: logger
+    #               message: message
+    #               request_id: request_id
+    #               method: method
+    #               endpoint: endpoint
+    #               status_code: status_code
+    #               duration: duration
+    #         # Optional: convert timestamp to Loki format
+    #         - timestamp:
+    #             source: timestamp
+    #             format: 2006-01-02T15:04:05

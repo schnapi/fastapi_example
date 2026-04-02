@@ -48,8 +48,8 @@ def init_observability(app):
     # logging.basicConfig(level=level, handlers=[handler])
 
     # Configure logging to stdout (Promtail will read it)
-    level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
-    logging.basicConfig(level=level, format="%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+    # level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
+    # logging.basicConfig(level=level, format="%(asctime)s | %(name)s | %(levelname)s | %(message)s")
 
     # Instrument FastAPI
     FastAPIInstrumentor.instrument_app(app)
