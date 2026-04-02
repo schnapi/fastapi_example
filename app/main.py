@@ -8,7 +8,6 @@ from app.models import User
 from app.resilience import registry
 from . import app, limiter
 
-# Configure logger
 logger = logging.getLogger("my-fastapi-app")
 
 STOCK_API_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
@@ -95,8 +94,10 @@ async def create_user(user: User):
 
 @app.get("/")
 def read_root():
-    logger.info("Root endpoint was called")
-    return {"message": "Hello, World1!"}
+    logger.info("test213")
+    logger.error("test213")
+    logger.warning("Root endpoint was called")
+    return {"message": "Hello, World!"}
 
 
 @app.get("/items/{item_id}")

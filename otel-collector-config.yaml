@@ -16,11 +16,15 @@ exporters:
     verbosity: detailed
 
   otlp/tempo:
-    endpoint: tempo:4317
+    endpoint: tempo:9095
     tls:
       insecure: true
 
 service:
+  telemetry:
+    logs:
+      level: warn # Only warn, error, fatal
+      encoding: json
   pipelines:
     traces:
       receivers: [otlp]

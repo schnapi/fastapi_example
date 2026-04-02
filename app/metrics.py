@@ -25,9 +25,7 @@ INCOMING_LATENCY = Histogram(
 
 async def tracked_request(method, url, request_id=None, **kwargs):
     start = time.time()
-    is_log_info = logger.isEnabledFor(logging.INFO)
-    if is_log_info:
-        logger.info(f"Outgoing request: {method} {url}")
+    logger.info(f"Outgoing request: {method} {url}")
 
     try:
         async with httpx.AsyncClient() as client:
@@ -37,10 +35,9 @@ async def tracked_request(method, url, request_id=None, **kwargs):
 
         OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code=status_code).inc()
         OUTGOING_HTTP_LATENCY.labels(method=method, endpoint=url).observe(elapsed)
-        if is_log_info:
-            logger.info(
-                f"Outgoing response: {method} {url} status={status_code} duration={elapsed:.3f}s"
-            )
+        logger.info(
+            f"Outgoing response: {method} {url} status={status_code} duration={elapsed:.3f}s"
+        )
         if status_code >= 500 or elapsed > 2.0:
             logger.warning(
                 "Slow external call",

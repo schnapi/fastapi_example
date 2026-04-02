@@ -1,9 +1,17 @@
 services:
   db:
     image: postgres:18.3
+    environment:
+      PGOPTIONS: >
+        -c log_min_messages=warning
+        -c log_min_error_statement=warning
+        -c log_destination=stderr
+        -c logging_collector=on
+        -c log_line_prefix=''
+        -c log_format=json"
     restart: unless-stopped
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -46,7 +54,7 @@ services:
     networks:
       - internal
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -70,45 +78,45 @@ services:
     networks:
       - internal
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.148.0
     container_name: otel_collector
     command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
     networks:
       - internal
+    depends_on:
+      - tempo
+      - loki
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
   tempo:
-    image: grafana/tempo:2.10.3
+    image: grafana/tempo:2.3.1
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     ports:
-      - "3200:3200"   # HTTP query frontend
+      - "3200:3200"
+      - "9095:9095"
     volumes:
-      - ./tempo-config.yaml:/etc/tempo.yaml
       - ./tempo-data:/tempo-data
+      - ./tempo-config.yaml:/etc/tempo.yaml
     networks:
       - internal
+    depends_on:
+      - loki
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -128,7 +136,7 @@ services:
     networks:
       - internal
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -150,7 +158,7 @@ services:
     depends_on:
       - loki
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -162,6 +170,9 @@ services:
 
   grafana:
     image: grafana/grafana:latest
+    environment:
+      - GF_LOG_LEVEL=warn
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     container_name: grafana
     ports:
       - "3000:3000"
@@ -172,8 +183,13 @@ services:
       - grafana_data:/var/lib/grafana
       - ./provisioning/dashboards:/etc/grafana/dashboards  # dashboards provisioning
       - ./provisioning/datasources:/etc/grafana/provisioning/datasources
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - internal
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nginx:
     image: nginx:1.29.6
@@ -202,7 +218,7 @@ services:
       start_period: 15s
       retries: 3
     logging:
-      driver: "json-file"
+      driver: local
       options:
         max-size: "10m"
         max-file: "3"
@@ -214,6 +230,7 @@ volumes:
   logs_volume:
   frontend_dist:
   grafana_data:
+  loki_data:
 
 networks:
   internal:

@@ -1,6 +1,8 @@
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: warn # Only warn, error, fatal
+  log_format: json
 
 positions:
   filename: /tmp/positions.yaml
@@ -13,15 +15,37 @@ scrape_configs:
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
     relabel_configs:
-      - source_labels: ['__meta_docker_container_name']
-        target_label: 'container'
-      - source_labels: ['__meta_docker_container_id']
-        target_label: 'container_id'
-      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        target_label: 'service'
-      - source_labels: ['__meta_docker_container_image_name']
-        target_label: 'image'
-      - source_labels: ['__meta_docker_container_name']
-        regex: '(.*)'
-        target_label: 'job'
-        replacement: 'docker/${1}'
+      - source_labels: ["__meta_docker_container_name"]
+        target_label: "container"
+      - source_labels: ["__meta_docker_container_id"]
+        target_label: "container_id"
+      - source_labels:
+          ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: "service"
+      - source_labels: ["__meta_docker_container_image_name"]
+        target_label: "image"
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "(.*)"
+        target_label: "job"
+        replacement: "docker/${1}"
+    pipeline_stages:
+      # Only process logs from the FastAPI container
+      - match:
+          selector: '{service="api"}'
+          stages:
+            # Parse JSON logs
+            - json:
+                expressions:
+                  timestamp: timestamp
+                  level: level
+                  logger: logger
+                  message: message
+                  request_id: request_id
+                  method: method
+                  endpoint: endpoint
+                  status_code: status_code
+                  duration: duration
+            # Optional: convert timestamp to Loki format
+            - timestamp:
+                source: timestamp
+                format: 2006-01-02T15:04:05

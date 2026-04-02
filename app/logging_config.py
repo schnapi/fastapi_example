@@ -12,7 +12,8 @@ log_queue = queue.Queue(-1)
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
-            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            # "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -47,6 +48,7 @@ def setup_logging():
 
     # Queue handler (non-blocking)
     queue_handler = QueueHandler(log_queue)
+    root_logger.handlers.clear()
     root_logger.addHandler(queue_handler)
 
     # Listener (runs in background thread)

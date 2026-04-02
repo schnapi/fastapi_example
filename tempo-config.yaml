@@ -3,6 +3,8 @@
 server:
   http_listen_port: 3200 # HTTP query frontend
   grpc_listen_port: 9095 # gRPC / OTLP ingestion
+  log_level: warn # Only warn, error, fatal
+  log_format: json
 
 distributor:
   receivers:
