@@ -46,7 +46,7 @@ app.add_middleware(
 limiter = Limiter(key_func=user_key, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-app.middleware("http")(metrics_middleware)
+# app.middleware("http")(metrics_middleware)
 
 
 @app.exception_handler(RateLimitExceeded)

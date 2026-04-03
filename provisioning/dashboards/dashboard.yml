@@ -7,4 +7,13 @@ providers:
     disableDeletion: false
     updateIntervalSeconds: 10
     options:
-      path: /etc/grafana/dashboards
+      path: /etc/grafana/provisioning/dashboards
+  - name: "json-dashboards"
+    orgId: 1
+    folder: "JSON Dashboards"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards

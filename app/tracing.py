@@ -1,11 +1,14 @@
-from opentelemetry import trace
+import os
+from starlette.middleware.wsgi import WSGIMiddleware
+from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
 
 # Tracing
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor  # ConsoleSpanExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
 # # Logging
 # from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 # from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
@@ -16,11 +19,14 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 # from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
-import os
-import logging
-
 
 def init_observability(app):
+    # Metrics setup - Prometheus exporter
+    reader = PrometheusMetricReader()  # Exposes /metrics
+    provider = MeterProvider(metric_readers=[reader])
+    metrics.set_meter_provider(provider)
+    app.mount("/metrics", WSGIMiddleware(reader))
+
     resource = Resource(
         attributes={
             "service.name": "my_fastapi_service",
@@ -35,6 +41,11 @@ def init_observability(app):
     tracer_provider.add_span_processor(
         BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317", insecure=True))
     )
+
+    # # Optional: export traces to console (for debugging)
+    # tracer = trace.get_tracer(__name__)
+    # span_processor = BatchSpanProcessor(ConsoleSpanExporter())
+    # trace.get_tracer_provider().add_span_processor(span_processor)
 
     # # Logs
     # logger_provider = LoggerProvider(resource=resource)

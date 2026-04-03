@@ -49,3 +49,14 @@ scrape_configs:
     #         - timestamp:
     #             source: timestamp
     #             format: 2006-01-02T15:04:05
+    # pipeline_stages:
+    #   # Parse nginx access logs
+    #   - match:
+    #       selector: '{service="nginx"}'
+    #       stages:
+    #         - regex:
+    #             expression: '^(?P<remote>[^ ]+) - (?P<user>[^ ]+) \[(?P<timestamp>[^\]]+)\] "(?P<method>\w+) (?P<path>[^ ]+) (?P<protocol>[^ ]+)" (?P<status>\d+) (?P<bytes>\d+)'
+    #         - labels:
+    #             status:
+    #             method:
+    #             path:
