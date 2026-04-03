@@ -1,6 +1,7 @@
 apiVersion: 1
 groups:
   - name: API_Health_Alerts
+    folder: alerts
     interval: 1m # Check the status every minute
     rules:
       - uid: api_error_threshold_5_4m
@@ -34,13 +35,16 @@ groups:
             model:
               type: threshold
               expression: B
+              refId: C
               conditions:
-                - type: gt
-                  evaluator:
-                    params: [5] # This is your "> 5" logic
+                - evaluator:
+                    params: [5]
+                    type: gt # This tells Grafana "Greater Than"
                   operator:
                     type: and
-              refId: C
+                  query:
+                    params: []
+                  type: query
 
         annotations:
           summary: "Excessive API Errors Detected"

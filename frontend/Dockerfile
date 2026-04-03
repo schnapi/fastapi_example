@@ -1,6 +1,6 @@
 FROM node:25-slim
 
-WORKDIR /app/frontend
+WORKDIR /app
 
 COPY package*.json ./
 RUN npm install

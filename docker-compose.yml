@@ -167,10 +167,10 @@ services:
     environment:
       - GF_LOG_LEVEL=warn
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      # - GF_SMTP_ENABLED=true
-      # - GF_SMTP_HOST=mailhog:1025
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=mailhog:1025
       # - GF_SMTP_FROM_ADDRESS=alerts@example.com
-      # - GF_SMTP_FROM_NAME=Grafana
+      - GF_SMTP_FROM_NAME=Grafana
     container_name: grafana
     ports:
       - "3000:3000"

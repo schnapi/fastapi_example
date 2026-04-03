@@ -12,11 +12,15 @@ services:
       - DEBUG=true
 
   frontend:
+    command: npm run dev -- --host
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     ports:
       - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
 
 volumes:
   frontend_node_modules:
