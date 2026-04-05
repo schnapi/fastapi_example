@@ -1,0 +1,57 @@
+{
+  "title": "PyResilience Dashboard",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Total Calls",
+      "targets": [
+        {
+          "expr": "rate(pyresilience_calls_total[1m])",
+          "legendFormat": "{{name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Retries Rate",
+      "targets": [
+        {
+          "expr": "rate(pyresilience_retries_total[1m])",
+          "legendFormat": "{{name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failures Rate",
+      "targets": [
+        {
+          "expr": "rate(pyresilience_failures_total[1m])",
+          "legendFormat": "{{name}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Circuit Breaker State",
+      "targets": [
+        {
+          "expr": "pyresilience_circuit_breaker_state",
+          "legendFormat": "{{name}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit Breaker Opens",
+      "targets": [
+        {
+          "expr": "increase(pyresilience_circuit_breaker_open_total[5m])",
+          "legendFormat": "{{name}}"
+        }
+      ]
+    }
+  ]
+}

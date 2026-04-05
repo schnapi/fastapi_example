@@ -1,0 +1,10 @@
+groups:
+  - name: global_health_alerts
+    rules:
+      - alert: AnyServiceDown
+        expr: min_over_time(service_health[5m]) == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "At least one service is down"
+          description: "Services down in the last 5 minutes: {{ range $labels := query 'service_health == 0' }}{{$labels.service}}, {{end}}"

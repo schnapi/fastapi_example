@@ -1,3 +1,15 @@
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-curl: &healthcheck-curl
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 30s
+
 services:
   db:
     image: postgres:18.3
@@ -11,11 +23,8 @@ services:
       -c log_destination=jsonlog
       -c log_line_prefix=''
     restart: unless-stopped
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+
     env_file:
       - .env
     volumes:
@@ -23,10 +32,8 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
+      <<: *healthcheck-curl
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
 
   api:
     build: .
@@ -44,27 +51,15 @@ services:
       - media_volume:/app/media
       - logs_volume:/app/logs
     depends_on:
-      db:
-        condition: service_healthy
-      otel-collector:
-        condition: service_started
-      loki:
-        condition: service_started
+      - db
     env_file:
       - .env
     networks:
       - internal
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-curl
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
 
   frontend:
     build:
@@ -72,39 +67,17 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     volumes:
-      - ./frontend:/app  # Mount frontend source for building
-      - frontend_dist:/app/dist  # Share built files with nginx
+      - ./frontend:/app
+      - frontend_dist:/app/dist
     environment:
       - NODE_ENV=production
     networks:
       - internal
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.148.0
-    container_name: otel_collector
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-      # - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      # - /var/run/docker.sock:/var/run/docker.sock:ro # Allow OTel to see container names
-    networks:
-      - internal
-    depends_on:
-      - tempo
-      - loki
-      - prometheus
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+    healthcheck:
+      <<: *healthcheck-curl
+      test: ["CMD", "test", "-f", "/app/dist/index.html"]
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -115,17 +88,15 @@ services:
     networks:
       - internal
     restart: unless-stopped
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+
   tempo:
     image: grafana/tempo:2.9.0
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     ports:
       - "3200:3200"   # HTTP frontend
+      - "4317:4317"   # gRPC OTLP receiver
     volumes:
       - ./tempo-data:/tempo-data
       - ./tempo-config.yaml:/etc/tempo.yaml
@@ -133,11 +104,8 @@ services:
       - internal
     depends_on:
       - loki
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
+      
   loki:
     image: grafana/loki:latest
     container_name: loki
@@ -146,18 +114,14 @@ services:
       - "3100:3100"
     volumes:
       - ./loki-config.yaml:/etc/loki-config.yaml
-      - ./loki-data/wal:/wal
+      - ./loki-data/wal:/loki/wal
       - ./loki-data/chunks:/tmp/loki/chunks
       - ./loki-data/cache:/tmp/loki/cache
       - ./loki-data/index:/tmp/loki/index
-      - ./loki-data/compactor:/var/loki
+      - ./loki-data/compactor:/tmp/loki/compactor
     networks:
       - internal
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   promtail:
     image: grafana/promtail:latest
@@ -170,11 +134,7 @@ services:
       - internal
     depends_on:
       - loki
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   grafana:
     build:
@@ -202,11 +162,7 @@ services:
       - ./provisioning/alerting:/etc/grafana/provisioning/alerting:ro
     networks:
       - internal
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   nginx:
     image: nginx:1.29.6
@@ -217,14 +173,12 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
-      - frontend_dist:/app/frontend:ro  # Mount frontend build output
+      - frontend_dist:/app/frontend:ro
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
     depends_on:
-      api:
-        condition: service_healthy
-      frontend:
-        condition: service_started
+      - api
+      - frontend
     networks:
       - internal
       - public
@@ -234,11 +188,7 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
@@ -252,12 +202,22 @@ services:
     networks:
       - internal
 
+  docker-api-exporter:
+    build:
+      context: ./docker_api_exporter
+      dockerfile: Dockerfile.exporter  # includes docker_api_exporter.py
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "9100:9100"
+    restart: always
+    
   mailhog:
     image: mailhog/mailhog
     platform: linux/amd64
     container_name: mailhog
     ports:
-      - "8025:8025"   # Web UI
+      - "8025:8025"
     networks:
       - internal
 

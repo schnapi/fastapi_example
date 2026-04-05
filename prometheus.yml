@@ -8,3 +8,9 @@ scrape_configs:
   - job_name: "nginx"
     static_configs:
       - targets: ["nginx-exporter:9113"] # Exporter URL
+  - job_name: "docker_services_health"
+    static_configs:
+      - targets: ["docker-api-exporter:9100"]
+
+rule_files:
+  - "alerts/prometheus-service-alerts.yaml"

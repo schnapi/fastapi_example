@@ -9,24 +9,21 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor  # ConsoleSpanExpo
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-# # Logging
-# from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
-# from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-# from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 
 # Instrumentation
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-# from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
 
-def init_observability(app):
+def init_metrics(app):
     # Metrics setup - Prometheus exporter
     reader = PrometheusMetricReader()  # Exposes /metrics
     provider = MeterProvider(metric_readers=[reader])
     metrics.set_meter_provider(provider)
     app.mount("/metrics", WSGIMiddleware(reader))
 
+
+def init_tracing(app):
     resource = Resource(
         attributes={
             "service.name": "my_fastapi_service",
@@ -34,29 +31,23 @@ def init_observability(app):
             "deployment.environment": os.getenv("ENV", "dev"),
         }
     )
-
     # Tracing only
     tracer_provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(tracer_provider)
     tracer_provider.add_span_processor(
-        BatchSpanProcessor(OTLPSpanExporter(endpoint="http://otel-collector:4317", insecure=True))
+        BatchSpanProcessor(OTLPSpanExporter(endpoint="http://tempo:4317", insecure=True))
     )
+    return trace.get_tracer(__name__)
+
+
+def init_metrics_and_tracing(app):
+    init_metrics(app)
+    init_tracing(app)
 
     # # Optional: export traces to console (for debugging)
     # tracer = trace.get_tracer(__name__)
     # span_processor = BatchSpanProcessor(ConsoleSpanExporter())
     # trace.get_tracer_provider().add_span_processor(span_processor)
-
-    # # Logs
-    # logger_provider = LoggerProvider(resource=resource)
-    # log_exporter = OTLPLogExporter(endpoint="http://otel-collector:4317", insecure=True)
-    # logger_provider.add_log_record_processor(BatchLogRecordProcessor(log_exporter))
-
-    # # Connect Python logging → OTel
-    # level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
-    # level = logging.INFO
-    # handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
-    # logging.basicConfig(level=level, handlers=[handler])
 
     # Configure logging to stdout (Promtail will read it)
     # level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
@@ -65,6 +56,3 @@ def init_observability(app):
     # Instrument FastAPI
     FastAPIInstrumentor.instrument_app(app)
     HTTPXClientInstrumentor().instrument()
-    # LoggingInstrumentor().instrument()
-
-    return trace.get_tracer(__name__)

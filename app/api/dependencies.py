@@ -2,6 +2,7 @@ from httpx import AsyncClient
 from typing import AsyncGenerator
 
 from app.utils.redis_utils import RedisClient, get_redis_client
+from app.metrics_middleware import TrackedAsyncClient
 
 
 def redis_dependency() -> RedisClient:
@@ -13,5 +14,5 @@ def redis_dependency() -> RedisClient:
 
 
 async def get_http_client() -> AsyncGenerator[AsyncClient, None]:
-    async with AsyncClient(timeout=5.0) as client:
+    async with TrackedAsyncClient(timeout=5.0) as client:
         yield client

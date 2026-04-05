@@ -23,48 +23,44 @@ INCOMING_LATENCY = Histogram(
 )
 
 
-async def tracked_request(method, url, request_id=None, **kwargs):
-    start = time.time()
-    logger.info(f"Outgoing request: {method} {url}")
+class TrackedAsyncClient(httpx.AsyncClient):
+    async def request(self, method, url, **kwargs):
+        start = time.time()
+        logger.info(f"Outgoing request: {method} {url}")
+        try:
+            response = await super().request(method, url, **kwargs)
+            elapsed = time.time() - start
+            status_code = response.status_code
+            OUTGOING_HTTP_REQUESTS.labels(
+                method=method, endpoint=url, status_code=status_code
+            ).inc()
+            OUTGOING_HTTP_LATENCY.labels(method=method, endpoint=url).observe(elapsed)
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.request(method, url, **kwargs)
-        elapsed = time.time() - start
-        status_code = response.status_code
-
-        OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code=status_code).inc()
-        OUTGOING_HTTP_LATENCY.labels(method=method, endpoint=url).observe(elapsed)
-        logger.info(
-            f"Outgoing response: {method} {url} status={status_code} duration={elapsed:.3f}s"
-        )
-        if status_code >= 500 or elapsed > 2.0:
-            logger.warning(
-                "Slow external call",
-                extra={
-                    "request_id": request_id,
-                    "method": method,
-                    "endpoint": url,
-                    "status_code": status_code,
-                    "duration": round(elapsed, 3),
-                },
+            logger.info(
+                f"Outgoing response: {method} {url} status={status_code} duration={elapsed:.3f}s"
             )
-        return response
-    except Exception:
-        elapsed = time.time() - start
-        logger.error(
-            "External request failed",
-            extra={
-                "request_id": request_id,
-                "method": method,
-                "endpoint": url,
-                "duration": round(elapsed, 3),
-                # "exception": str(e),
-            },
-            exc_info=True,  # includes full traceback in logs
-        )
-        OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code="error").inc()
-        raise
+
+            if status_code >= 500 or elapsed > 2.0:
+                logger.warning(
+                    "Slow external call",
+                    extra={
+                        "method": method,
+                        "endpoint": url,
+                        "status_code": status_code,
+                        "duration": round(elapsed, 3),
+                    },
+                )
+            return response
+
+        except Exception:
+            elapsed = time.time() - start
+            logger.error(
+                "External request failed",
+                extra={"method": method, "endpoint": url, "duration": round(elapsed, 3)},
+                exc_info=True,
+            )
+            OUTGOING_HTTP_REQUESTS.labels(method=method, endpoint=url, status_code="error").inc()
+            raise
 
 
 # Middleware function (not yet attached to app)

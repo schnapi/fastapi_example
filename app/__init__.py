@@ -16,8 +16,8 @@ from app.models import User
 from app.utils.rate_limit_utils import user_key
 from app.api.router import api_router
 from app import resilience  # noqa: F401 # needed to register resilience decorators
-from app.metrics import metrics_middleware
-from app.tracing import init_observability
+from app.metrics_middleware import metrics_middleware
+from app.metrics_and_tracing import init_metrics_and_tracing
 from app.logging_config import setup_logging
 
 # Enable debugpy in development
@@ -31,7 +31,7 @@ log_listener = setup_logging()
 redis_client = get_redis_client()
 
 app = FastAPI(lifespan=db.lifespan(default=settings.database_url))
-tracer = init_observability(app)
+tracer = init_metrics_and_tracing(app)
 app.include_router(api_router)
 admin = FastAPIAdmin(title="My Dashboard")
 admin.register(User, list_display=["username", "email"], search_fields=["username"])
@@ -46,7 +46,7 @@ app.add_middleware(
 limiter = Limiter(key_func=user_key, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-# app.middleware("http")(metrics_middleware)
+app.middleware("http")(metrics_middleware)
 
 
 @app.exception_handler(RateLimitExceeded)
