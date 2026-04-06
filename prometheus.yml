@@ -4,7 +4,7 @@ global:
 scrape_configs:
   - job_name: "api"
     static_configs:
-      - targets: ["api:8001"] # port where OTEL Prometheus exporter is exposed
+      - targets: ["api:8000"] # port where OTEL Prometheus exporter is exposed
   - job_name: "nginx"
     static_configs:
       - targets: ["nginx-exporter:9113"] # Exporter URL

@@ -1,11 +1,11 @@
 apiVersion: 1
 
 providers:
-  - name: "alertmanager"
+  - name: "alert-rules-provisioning"
     orgId: 1
     type: file
     disableDeletion: false
     updateIntervalSeconds: 10
-    allowUiUpdates: false
+    folder: "alerts"
     options:
-      path: /etc/grafana/provisioning/alerting/alertmanager.yml
+      path: /etc/grafana/provisioning/alerting

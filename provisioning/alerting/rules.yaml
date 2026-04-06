@@ -1,26 +1,29 @@
 apiVersion: 1
 groups:
-  - name: API_Health_Alerts
+  - orgId: 1
+    name: API Health Alerts
     folder: alerts
-    interval: 1m # Check the status every minute
+    interval: 1m
     rules:
-      - uid: api_error_threshold_5_4m
+      - uid: api_error_threshold
         title: "API High Error Count (>5 in 4m)"
-        condition: C # Point to the Threshold step
-        for: 2m # Must stay above 5 for 2 minutes to avoid "blips"
+        condition: C
+        for: 2m
+        noDataState: NoData
+        execErrState: Alerting
         data:
           # Step A: The Loki Query
           - refId: A
             queryType: instant
             relativeTimeRange:
-              from: 600 # 10 minute buffer
+              from: 600
               to: 0
             datasourceUid: P8E80F9AEF21F6940
             model:
               expr: 'sum(count_over_time({service="api"} |= "ERROR" [4m]))'
               refId: A
 
-          # Step B: The Reduction (Turning Table into Number)
+          # Step B: The Reduction
           - refId: B
             datasourceUid: "-100"
             model:
@@ -29,7 +32,7 @@ groups:
               reducer: last
               refId: B
 
-          # Step C: The Threshold (Logic check)
+          # Step C: The Threshold
           - refId: C
             datasourceUid: "-100"
             model:
@@ -39,7 +42,7 @@ groups:
               conditions:
                 - evaluator:
                     params: [5]
-                    type: gt # This tells Grafana "Greater Than"
+                    type: gt
                   operator:
                     type: and
                   query:
@@ -48,6 +51,6 @@ groups:
 
         annotations:
           summary: "Excessive API Errors Detected"
-          description: "The API has logged {{ $values.B.Value }} errors in the last 4 minutes. Threshold is 5."
+          description: "The API has logged {{ $values.B }} errors in the last 4 minutes. Threshold is 5."
         labels:
           severity: critical

@@ -6,8 +6,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy exporter code
-COPY docker_api_exporter.py .
+# Copy all Python files
+COPY *.py .
 
 # Run exporter
 CMD ["python", "docker_api_exporter.py"]

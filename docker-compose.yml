@@ -159,7 +159,7 @@ services:
       - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./provisioning/jsondashboards:/var/lib/grafana/dashboards
       - ./provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ./provisioning/alerting:/etc/grafana/provisioning/alerting:ro
+      - ./provisioning/alerting:/etc/grafana/provisioning/alerting
     networks:
       - internal
     logging: *default-logging
@@ -211,6 +211,8 @@ services:
     ports:
       - "9100:9100"
     restart: always
+    networks:
+      - internal
     
   mailhog:
     image: mailhog/mailhog
