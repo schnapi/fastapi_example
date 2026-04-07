@@ -28,35 +28,27 @@ scrape_configs:
         regex: "(.*)"
         target_label: "job"
         replacement: "docker/${1}"
-    # pipeline_stages:
-    #   # Only process logs from the FastAPI container
-    #   - match:
-    #       selector: '{service="api"}'
-    #       stages:
-    #         # Parse JSON logs
-    #         - json:
-    #             expressions:
-    #               timestamp: timestamp
-    #               level: level
-    #               logger: logger
-    #               message: message
-    #               request_id: request_id
-    #               method: method
-    #               endpoint: endpoint
-    #               status_code: status_code
-    #               duration: duration
-    #         # Optional: convert timestamp to Loki format
-    #         - timestamp:
-    #             source: timestamp
-    #             format: 2006-01-02T15:04:05
-    # pipeline_stages:
-    #   # Parse nginx access logs
-    #   - match:
-    #       selector: '{service="nginx"}'
-    #       stages:
-    #         - regex:
-    #             expression: '^(?P<remote>[^ ]+) - (?P<user>[^ ]+) \[(?P<timestamp>[^\]]+)\] "(?P<method>\w+) (?P<path>[^ ]+) (?P<protocol>[^ ]+)" (?P<status>\d+) (?P<bytes>\d+)'
-    #         - labels:
-    #             status:
-    #             method:
-    #             path:
+    pipeline_stages:
+      # Only process logs from the FastAPI container
+      - match:
+          selector: '{service="api"}'
+          stages:
+            - drop:
+                expression: "(GET /metrics|GET /health)"
+            - json:
+                expressions:
+                  timestamp: timestamp
+                  level: level
+                  logger: logger
+                  message: message
+                  request_id: request_id
+                  method: method
+                  endpoint: endpoint
+                  status_code: status_code
+                  duration: duration
+                on_error: keep
+            # Optional: convert timestamp to Loki format
+            - timestamp:
+                source: timestamp
+                format: 2006-01-02T15:04:05
+                on_error: keep

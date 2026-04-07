@@ -1,26 +1,28 @@
 import os
-from starlette.middleware.wsgi import WSGIMiddleware
-from opentelemetry import trace, metrics
+from opentelemetry import trace  # , metrics
 from opentelemetry.sdk.resources import Resource
 
 # Tracing
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor  # ConsoleSpanExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.exporter.prometheus import PrometheusMetricReader
+# from opentelemetry.sdk.metrics import MeterProvider
+# from opentelemetry.exporter.prometheus import PrometheusMetricReader
 
 # Instrumentation
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
+from prometheus_client import make_asgi_app
+
 
 def init_metrics(app):
     # Metrics setup - Prometheus exporter
-    reader = PrometheusMetricReader()  # Exposes /metrics
-    provider = MeterProvider(metric_readers=[reader])
-    metrics.set_meter_provider(provider)
-    app.mount("/metrics", WSGIMiddleware(reader))
+    # reader = PrometheusMetricReader()  # Exposes /metrics
+    # provider = MeterProvider(metric_readers=[reader])
+    # metrics.set_meter_provider(provider)
+
+    app.mount("/metrics", make_asgi_app())
 
 
 def init_tracing(app):

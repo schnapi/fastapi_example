@@ -16,8 +16,8 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 COPY . /app
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Install curl for healthcheck and postgresql-client for pg_isready
+RUN apt-get update && apt-get install -y --no-install-recommends curl postgresql-client && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user and set ownership of /app
 RUN useradd -m myuser \

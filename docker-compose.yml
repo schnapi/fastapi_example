@@ -66,23 +66,29 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    volumes:
-      - ./frontend:/app
-      - frontend_dist:/app/dist
-    environment:
-      - NODE_ENV=production
     networks:
       - internal
-    logging: *default-logging
+    profiles: ["dev"]  # only run when profile 'dev' is enabled
+    command: npm run dev -- --host
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
     healthcheck:
-      <<: *healthcheck-curl
-      test: ["CMD", "test", "-f", "/app/dist/index.html"]
+      test: "exit 0"
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --log.level=warn
     ports:
       - "9090:9090"
     networks:
@@ -178,7 +184,6 @@ services:
       - media_volume:/app/media:ro
     depends_on:
       - api
-      - frontend
     networks:
       - internal
       - public
@@ -229,6 +234,7 @@ volumes:
   media_volume:
   logs_volume:
   frontend_dist:
+  frontend_node_modules:
   grafana_data:
   loki_data:
 
