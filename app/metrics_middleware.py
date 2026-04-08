@@ -4,6 +4,7 @@ import uuid
 from fastapi import Request
 import httpx
 from prometheus_client import Counter, Histogram
+from app.utils.geoip_utils import get_country_from_ip, extract_client_ip
 
 logger = logging.getLogger("metrics")
 
@@ -67,15 +68,19 @@ class TrackedAsyncClient(httpx.AsyncClient):
 async def metrics_middleware(request: Request, call_next):
     method = request.method
     endpoint = request.url.path
+    client_ip = extract_client_ip(request)
+    country = get_country_from_ip(client_ip)
 
     # Generate request ID
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
+    request.state.client_ip = client_ip
+    request.state.country = country
 
     start = time.time()
     is_log_info = logger.isEnabledFor(logging.INFO)
     if is_log_info:
-        logger.info(f"Incoming request: {method} {endpoint}")
+        logger.info(f"Incoming request: {method} {endpoint} from {client_ip} ({country})")
     try:
         response = await call_next(request)
     except Exception as e:
@@ -85,7 +90,8 @@ async def metrics_middleware(request: Request, call_next):
                 "request_id": request_id,
                 "method": method,
                 "endpoint": endpoint,
-                # "exception": str(e),
+                "client_addr": client_ip,
+                "country": country,
             },
             exc_info=True,  # includes full traceback in logs
         )
@@ -99,7 +105,7 @@ async def metrics_middleware(request: Request, call_next):
     # Info logs (dev only)
     if is_log_info:
         logger.info(
-            f"Completed request: {method} {endpoint} status={status_code} duration={elapsed:.3f}s"
+            f"Completed request: {method} {endpoint} status={status_code} duration={elapsed:.3f}s from {client_ip}"
         )
     # Production logs (important signals)
     if status_code >= 500 or elapsed > 2.0:
@@ -111,6 +117,8 @@ async def metrics_middleware(request: Request, call_next):
                 "endpoint": endpoint,
                 "status_code": status_code,
                 "duration": round(elapsed, 3),
+                "client_addr": client_ip,
+                "country": country,
             },
         )
     return response

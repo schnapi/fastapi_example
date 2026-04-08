@@ -29,10 +29,18 @@ class JsonFormatter(logging.Formatter):
             log_record["status_code"] = record.status_code
         if hasattr(record, "duration"):
             log_record["duration"] = record.duration
+        if hasattr(record, "client_addr"):
+            log_record["client_ip"] = record.client_addr
+        if hasattr(record, "country"):
+            log_record["country"] = record.country
+        if hasattr(record, "path"):
+            log_record["path"] = record.path
+        if hasattr(record, "http_version"):
+            log_record["http_version"] = record.http_version
         return json.dumps(log_record)
 
 
-def setup_logging():
+def setup_logging(for_docker=True):
     root_logger = logging.getLogger()
     level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
     root_logger.setLevel(level)
@@ -46,9 +54,18 @@ def setup_logging():
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
 
+    # # Configure slowapi logger
+    # slowapi_logger = logging.getLogger("slowapi")
+    # slowapi_logger.addHandler(console_handler)
+    # slowapi_logger.setLevel(logging.INFO)
+
+    root_logger.handlers.clear()
+    if for_docker:
+        root_logger.addHandler(console_handler)
+        return
+
     # Queue handler (non-blocking)
     queue_handler = QueueHandler(log_queue)
-    root_logger.handlers.clear()
     root_logger.addHandler(queue_handler)
 
     # Listener (runs in background thread)

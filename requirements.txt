@@ -22,3 +22,4 @@ opentelemetry-instrumentation-logging
 opentelemetry-exporter-otlp
 opentelemetry-exporter-prometheus
 opentelemetry-exporter-otlp-proto-grpc
+geoip2

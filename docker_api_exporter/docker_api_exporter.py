@@ -97,18 +97,18 @@ def update_metrics():
             try:
                 if method():
                     SERVICE_HEALTH.labels(service=name).set(1)
-                    logger.info("HTTP check %s: healthy", name)
+                    logger.info(f"HTTP check {name}: healthy")
                 else:
                     SERVICE_HEALTH.labels(service=name).set(0)
-                    logger.warning("HTTP check %s: unhealthy", name)
+                    logger.warning(f"HTTP check {name}: unhealthy")
             except Exception as e:
                 SERVICE_HEALTH.labels(service=name).set(0)
-                logger.error("HTTP check %s failed: %s", name, e)
+                logger.error(f"HTTP check {name} failed: {e}")
             continue
         try:
             health = container.attrs.get("State", {}).get("Health", {})
             status = health.get("Status", "unknown")
-            logger.info("Container %s health status: %s", name, status)
+            logger.info(f"Container {name} health status: {status}")
             if status == "healthy":
                 SERVICE_HEALTH.labels(service=name).set(1)
             else:

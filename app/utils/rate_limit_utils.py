@@ -29,4 +29,7 @@ def api_key_key(request: Request):
 
 
 def real_ip(request: Request):
-    return request.headers.get("X-Forwarded-For", request.client.host)
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.client.host

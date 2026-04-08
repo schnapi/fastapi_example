@@ -45,6 +45,7 @@ services:
         sleep 2;
       done;
       gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 \
+      --proxy-headers --forwarded-allow-ips="*" \
       --access-logfile - --error-logfile -"
     volumes:
       - static_volume:/app/staticfiles
@@ -134,6 +135,8 @@ services:
     container_name: promtail
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - nginx_logs:/var/log/nginx:ro
       - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
     command: -config.file=/etc/promtail/config.yaml
     networks:
@@ -171,7 +174,9 @@ services:
     logging: *default-logging
 
   nginx:
-    image: nginx:1.29.6
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -179,9 +184,11 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      - ./data/GeoLite2-Country.mmdb:/etc/nginx/GeoLite2-Country.mmdb:ro
       - frontend_dist:/app/frontend:ro
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
+      - nginx_logs:/var/log/nginx
     depends_on:
       - api
     networks:
@@ -237,6 +244,7 @@ volumes:
   frontend_node_modules:
   grafana_data:
   loki_data:
+  nginx_logs:
 
 networks:
   internal:

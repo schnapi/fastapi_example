@@ -1,0 +1,116 @@
+{
+  "id": null,
+  "uid": "nginx_country_dashboard",
+  "title": "NGINX Traffic by Country",
+  "timezone": "browser",
+  "schemaVersion": 37,
+  "version": 0,
+  "refresh": "30s",
+  "tags": ["nginx", "geo", "traffic"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Requests (Last 5m)",
+      "gridPos": {"x": 0, "y": 0, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"nginx\"} [5m])",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Unique Countries",
+      "gridPos": {"x": 8, "y": 0, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "count(count_over_time({job=\"nginx\"} [5m]) by (country))",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "5xx Errors",
+      "gridPos": {"x": 16, "y": 0, "w": 8, "h": 4},
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"nginx\"} | json status=~\"5..\" [5m])",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Top 10 Countries by Requests",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "topk(10, sum by (country_name) (count_over_time({job=\"nginx\"} [5m])))",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request Rate by Top Countries",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "topk(5, sum by (country_name) (rate({job=\"nginx\"} [1m])))",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Top 20 IPs by Country",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "topk(20, sum by (remote_addr, country_name) (count_over_time({job=\"nginx\"} [5m])))",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Recent Requests",
+      "gridPos": {"x": 0, "y": 20, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "{job=\"nginx\"} | json | line_format \"{{.remote_addr}} ({{.country_name}}) {{.method}} {{.path}} {{.status}}\"",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Status Code Distribution",
+      "gridPos": {"x": 0, "y": 28, "w": 24, "h": 8},
+      "targets": [
+        {
+          "expr": "sum by (status) (rate({job=\"nginx\"} | json [1m]))",
+          "refId": "A",
+          "datasource": {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+        }
+      ]
+    }
+  ]
+}

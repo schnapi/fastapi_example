@@ -26,7 +26,7 @@ if settings.debug:
 
     enable_debugpy()
 
-log_listener = setup_logging()
+setup_logging()
 
 redis_client = get_redis_client()
 
