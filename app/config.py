@@ -12,15 +12,11 @@ class Settings(BaseSettings):
     secret_key: str = "defaultsecret"
 
     # CORS - Allow Vite dev server in development
-    allowed_origins: list[str] = [
-        "http://localhost:5173",
-        "http://localhost",
-        "http://127.0.0.1",
-    ]
+    allowed_origins: list[str] = ["http://localhost:5173", "http://localhost", "http://127.0.0.1"]
 
     class Config:
         env_file = ".env"
-        extra = "forbid"
+        extra = "ignore"
 
 
 settings = Settings()  # type: ignore

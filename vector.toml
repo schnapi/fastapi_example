@@ -116,8 +116,45 @@ if original_timestamp != null {
   .timestamp = original_timestamp
 }
 
+# Extract PostgreSQL log level if present (LOG:, ERROR:, WARNING:, etc)
+if .service == "db" && is_string(.log) {
+  log_str = string!(.log)
+  if starts_with(log_str, "ERROR:") {
+    .level = "error"
+  } else if starts_with(log_str, "WARNING:") || starts_with(log_str, "WARN:") {
+    .level = "warn"
+  } else if starts_with(log_str, "LOG:") || starts_with(log_str, "INFO:") {
+    .level = "info"
+  } else if starts_with(log_str, "DEBUG:") {
+    .level = "debug"
+  }
+}
+
+# Generic extractor for level=LEVEL or "level":"LEVEL" or space-padded LEVEL patterns
+if is_string(.log) && !exists(.level) {
+  log_str = downcase(string!(.log))
+  
+  # Check for level=error, level=warn, level=info, level=debug (case insensitive)
+  if contains(log_str, "level=error") || contains(log_str, "level=fatal") || contains(log_str, " error ") || contains(log_str, "\"level\":\"error\"") || contains(log_str, "\"level\":\"fatal\"") {
+    .level = "error"
+  } else if contains(log_str, "level=warn") || contains(log_str, "level=warning") || contains(log_str, " warn ") || contains(log_str, " warning ") || contains(log_str, "\"level\":\"warn\"") || contains(log_str, "\"level\":\"warning\"") {
+    .level = "warn"
+  } else if contains(log_str, "level=info") || contains(log_str, " info ") || contains(log_str, "\"level\":\"info\"") {
+    .level = "info"
+  } else if contains(log_str, "level=debug") || contains(log_str, " debug ") || contains(log_str, "\"level\":\"debug\"") {
+    .level = "debug"
+  }
+}
+
 # Set defaults if not present
-.level = .level || "info"
+if !exists(.level) {
+  # If stream is stderr, it's likely an error
+  if exists(.stream) && .stream == "stderr" {
+    .level = "error"
+  } else {
+    .level = "info"
+  }
+}
 .request_id = .request_id || "unknown"
 '''
 

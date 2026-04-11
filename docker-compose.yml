@@ -51,8 +51,10 @@ services:
         echo 'Waiting for database...';
         sleep 2;
       done;
-      gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 \
-      --proxy-headers --forwarded-allow-ips=\"*\" \
+      gunicorn -k uvicorn.workers.UvicornWorker app.main:app
+      -w $((2 * $(nproc) + 1))
+      -b 0.0.0.0:8000
+      --proxy-headers --forwarded-allow-ips=\"*\"
       --access-logfile - --error-logfile -"
     volumes:
       - static_volume:/app/staticfiles
@@ -64,6 +66,7 @@ services:
       - .env
     networks:
       - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
     cap_drop:
@@ -90,8 +93,6 @@ services:
     environment:
       - NODE_ENV=development
     working_dir: /app
-    healthcheck:
-      test: "exit 0"
     logging: *default-logging
     <<: *security-defaults
 
@@ -103,10 +104,8 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --log.level=warn
-    # ports:
-    #   - "127.0.0.1:9090:9090"
     networks:
-      - internal
+      - observability
     restart: unless-stopped
     logging: *default-logging
     <<: *security-defaults
@@ -121,7 +120,7 @@ services:
       - ./tempo-data:/tempo-data
       - ./tempo-config.yaml:/etc/tempo.yaml
     networks:
-      - internal
+      - observability
     depends_on:
       - loki
     logging: *default-logging
@@ -141,7 +140,7 @@ services:
       - ./loki-data/index:/tmp/loki/index
       - ./loki-data/compactor:/tmp/loki/compactor
     networks:
-      - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
     cap_drop:
@@ -159,7 +158,7 @@ services:
       - VECTOR_REQUIRE_HEALTHY=true
     command: ["--config", "/etc/vector/vector.toml"]
     networks:
-      - internal
+      - observability
     depends_on:
       - loki
     logging: *default-logging
@@ -189,6 +188,7 @@ services:
       - ./provisioning/alerting:/etc/grafana/provisioning/alerting
     networks:
       - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
 
@@ -224,13 +224,13 @@ services:
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
-    container_name: nginx_exporter
-    command: >
-      -nginx.scrape-uri http://nginx:80/nginx_status
+    command:
+      - -nginx.scrape-uri=http://nginx:80/nginx_status
     depends_on:
       - nginx
     networks:
       - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
     cap_drop:
@@ -245,7 +245,7 @@ services:
       - ./app/logging_config.py:/app/logging_config.py:ro
     restart: always
     networks:
-      - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
     cap_drop:
@@ -260,6 +260,7 @@ services:
       - "8025:8025"
     networks:
       - internal
+      - observability
     logging: *default-logging
     <<: *security-defaults
 
@@ -271,7 +272,6 @@ volumes:
   frontend_dist:
   frontend_node_modules:
   grafana_data:
-  loki_data:
   nginx_logs:
   vector-data:
 
@@ -279,4 +279,6 @@ networks:
   internal:
     driver: bridge
   public:
+    driver: bridge
+  observability:
     driver: bridge
