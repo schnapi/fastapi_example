@@ -39,6 +39,8 @@ SCRAPE_INTERVAL = 3  # seconds
 
 
 def grafana_healthcheck(service_name, port):
+    if not port:
+        port = 3000
     try:
         response = requests.get(f"http://{service_name}:{port}/api/health", timeout=5)
         return response.status_code == 200 and response.json().get("database") == "ok"
@@ -57,6 +59,8 @@ def promtail_healthcheck(service_name, port):
 
 
 def loki_healthcheck(service_name, port):
+    if not port:
+        port = 3100
     try:
         response = requests.get(f"http://{service_name}:{port}/ready", timeout=5)
         return response.status_code == 200
@@ -66,6 +70,8 @@ def loki_healthcheck(service_name, port):
 
 
 def prometheus_healthcheck(service_name, port):
+    if not port:
+        port = 9090
     try:
         response = requests.get(f"http://{service_name}:{port}/-/ready", timeout=5)
         return response.status_code == 200
@@ -84,6 +90,8 @@ def mailhog_healthcheck(service_name, port):
 
 
 def nginx_exporter_healthcheck(service_name, port):
+    if not port:
+        port = 9113
     try:
         response = requests.get(f"http://{service_name}:{port}/metrics", timeout=5)
         return response.status_code == 200
@@ -117,6 +125,7 @@ HTTP_CHECK_SERVICES = {
     "nginx-exporter": lambda service_name, port: True,
     "api": lambda service_name, port: True,
     "frontend": lambda service_name, port: True,
+    "db": lambda service_name, port: True,
 }
 
 

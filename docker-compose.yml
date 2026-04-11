@@ -68,6 +68,7 @@ services:
     <<: *security-defaults
     cap_drop:
       - ALL
+    read_only: true
     healthcheck:
       <<: *healthcheck-curl
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
@@ -102,8 +103,8 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --log.level=warn
-    ports:
-      - "127.0.0.1:9090:9090"
+    # ports:
+    #   - "127.0.0.1:9090:9090"
     networks:
       - internal
     restart: unless-stopped
@@ -116,9 +117,6 @@ services:
     image: grafana/tempo:2.9.0
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
-    ports:
-      - "127.0.0.1:3200:3200"
-      - "127.0.0.1:4317:4317"
     volumes:
       - ./tempo-data:/tempo-data
       - ./tempo-config.yaml:/etc/tempo.yaml
@@ -135,8 +133,6 @@ services:
     image: grafana/loki:latest
     container_name: loki
     command: -config.file=/etc/loki-config.yaml
-    ports:
-      - "127.0.0.1:3100:3100"
     volumes:
       - ./loki-config.yaml:/etc/loki-config.yaml
       - ./loki-data/wal:/loki/wal
@@ -174,13 +170,13 @@ services:
     container_name: grafana
     environment:
       GF_LOG_LEVEL: "warn"
-      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_SMTP_ENABLED: "true"
       GF_SMTP_HOST: mailhog:1025
       GF_SMTP_SKIP_VERIFY: "true"
       GF_SMTP_FROM_NAME: "Grafana"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - tempo
       - loki
@@ -229,8 +225,6 @@ services:
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     container_name: nginx_exporter
-    ports:
-      - "9113:9113"
     command: >
       -nginx.scrape-uri http://nginx:80/nginx_status
     depends_on:

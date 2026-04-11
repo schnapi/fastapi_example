@@ -7,6 +7,8 @@ logger = logging.getLogger(__name__)
 
 
 def check_tempo_comprehensive(service_name, port):
+    if not port:
+        port = 3200
     checks = {"metrics_endpoint": False, "otlp_port": False}
 
     # Check metrics endpoint
