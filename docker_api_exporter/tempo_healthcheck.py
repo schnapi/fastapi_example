@@ -6,12 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def check_tempo_comprehensive():
+def check_tempo_comprehensive(service_name, port):
     checks = {"metrics_endpoint": False, "otlp_port": False}
 
     # Check metrics endpoint
     try:
-        response = requests.get("http://tempo:3200/metrics", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/metrics", timeout=5)
         checks["metrics_endpoint"] = (
             response.status_code == 200 and "go_goroutines" in response.text
         )

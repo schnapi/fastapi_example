@@ -1,9 +1,0 @@
-FROM grafana/grafana:latest
-
-USER root
-RUN sed -i 's/^;enabled = false/enabled = true/' /etc/grafana/grafana.ini && \
-    sed -i 's/^;host = localhost:25/host = mailhog:1025/' /etc/grafana/grafana.ini && \
-    sed -i 's/^;password =/password =/' /etc/grafana/grafana.ini && \
-    sed -i 's/^;skip_verify = false/skip_verify = true/' /etc/grafana/grafana.ini
-
-USER grafana

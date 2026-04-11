@@ -9,5 +9,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all Python files
 COPY *.py .
 
+USER 1000:1000
 # Run exporter
 CMD ["python", "docker_api_exporter.py"]

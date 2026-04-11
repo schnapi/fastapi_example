@@ -11,6 +11,12 @@ x-healthcheck-curl: &healthcheck-curl
   retries: 3
   start_period: 30s
 
+x-security-defaults: &security-defaults
+  security_opt:
+    - no-new-privileges:true
+    # - seccomp=default
+    # - apparmor=docker-default
+
 services:
   db:
     image: postgres:18.3
@@ -25,7 +31,7 @@ services:
       -c log_line_prefix=''
     restart: unless-stopped
     logging: *default-logging
-
+    <<: *security-defaults
     env_file:
       - .env
     volumes:
@@ -46,7 +52,7 @@ services:
         sleep 2;
       done;
       gunicorn -k uvicorn.workers.UvicornWorker app.main:app -w $((2 * $(nproc) + 1)) -b 0.0.0.0:8000 \
-      --proxy-headers --forwarded-allow-ips="*" \
+      --proxy-headers --forwarded-allow-ips=\"*\" \
       --access-logfile - --error-logfile -"
     volumes:
       - static_volume:/app/staticfiles
@@ -59,6 +65,9 @@ services:
     networks:
       - internal
     logging: *default-logging
+    <<: *security-defaults
+    cap_drop:
+      - ALL
     healthcheck:
       <<: *healthcheck-curl
       test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
@@ -83,6 +92,7 @@ services:
     healthcheck:
       test: "exit 0"
     logging: *default-logging
+    <<: *security-defaults
 
   prometheus:
     image: prom/prometheus:latest
@@ -98,6 +108,9 @@ services:
       - internal
     restart: unless-stopped
     logging: *default-logging
+    <<: *security-defaults
+    cap_drop:
+      - ALL
 
   tempo:
     image: grafana/tempo:2.9.0
@@ -114,7 +127,10 @@ services:
     depends_on:
       - loki
     logging: *default-logging
-      
+    <<: *security-defaults
+    cap_drop:
+      - ALL
+
   loki:
     image: grafana/loki:latest
     container_name: loki
@@ -131,6 +147,9 @@ services:
     networks:
       - internal
     logging: *default-logging
+    <<: *security-defaults
+    cap_drop:
+      - ALL
 
   vector:
     image: timberio/vector:0.54.0-alpine
@@ -148,18 +167,18 @@ services:
     depends_on:
       - loki
     logging: *default-logging
+    <<: *security-defaults
 
   grafana:
-    build:
-      context: .
-      dockerfile: Dockerfile.grafana
-    environment:
-      - GF_LOG_LEVEL=warn
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SMTP_ENABLED=true
-      - GF_SMTP_HOST=mailhog:1025
-      - GF_SMTP_FROM_NAME=Grafana
+    image: grafana/grafana:latest
     container_name: grafana
+    environment:
+      GF_LOG_LEVEL: "warn"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: mailhog:1025
+      GF_SMTP_SKIP_VERIFY: "true"
+      GF_SMTP_FROM_NAME: "Grafana"
     ports:
       - "3000:3000"
     depends_on:
@@ -175,6 +194,7 @@ services:
     networks:
       - internal
     logging: *default-logging
+    <<: *security-defaults
 
   nginx:
     build:
@@ -204,6 +224,7 @@ services:
       start_period: 15s
       retries: 3
     logging: *default-logging
+    <<: *security-defaults
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
@@ -217,21 +238,26 @@ services:
     networks:
       - internal
     logging: *default-logging
+    <<: *security-defaults
+    cap_drop:
+      - ALL
 
   docker-api-exporter:
     build:
       context: ./docker_api_exporter
       dockerfile: Dockerfile.exporter
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./app/logging_config.py:/app/logging_config.py
-    ports:
-      - "9100:9100"
+      - ./docker-compose.yml:/app/docker-compose.yml:ro
+      - ./app/logging_config.py:/app/logging_config.py:ro
     restart: always
     networks:
       - internal
     logging: *default-logging
-    
+    <<: *security-defaults
+    cap_drop:
+      - ALL
+    read_only: true
+
   mailhog:
     image: mailhog/mailhog
     platform: linux/amd64
@@ -241,6 +267,7 @@ services:
     networks:
       - internal
     logging: *default-logging
+    <<: *security-defaults
 
 volumes:
   pgdata:

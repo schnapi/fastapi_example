@@ -4,6 +4,7 @@ import sys
 import queue
 import json
 from logging.handlers import QueueHandler, QueueListener
+import traceback
 
 # Create a global log queue
 log_queue = queue.Queue(-1)
@@ -19,6 +20,13 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
 
+        if record.exc_info:
+            log_record["exception"] = traceback.format_exception(*record.exc_info)  # type: ignore
+            # {
+            #     "type": str(record.exc_info[0].__name__),  # type: ignore
+            #     "message": str(record.exc_info[1]),
+            #     "stacktrace": traceback.format_exception(*record.exc_info)
+            # }
         for attr in [
             "request_id",
             "method",

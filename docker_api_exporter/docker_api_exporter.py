@@ -3,8 +3,27 @@ import time
 import requests
 import logging_config
 from prometheus_client import start_http_server, Gauge
-import docker
 import tempo_healthcheck
+import yaml
+# import docker
+
+
+class ComposeParser:
+    def __init__(self, compose_path: str):
+        self.compose_path = compose_path
+        with open(self.compose_path, "r") as f:
+            self.data = yaml.safe_load(f)
+
+    def get_services(self):
+        return self.data.get("services", {}) if self.data else {}
+
+    def extract_healthcheck_ports(self):
+        result = {}
+        for name, config in self.get_services().items():
+            ports = config.get("ports", [])
+            healthcheck = config.get("healthcheck", None)
+            result[name] = {"ports": ports, "healthcheck": healthcheck}
+        return result
 
 
 logging_config.setup_logging(level=logging.INFO)
@@ -14,69 +33,69 @@ logger = logging.getLogger(__name__)
 # 1 = healthy, 0 = unhealthy
 SERVICE_HEALTH = Gauge("service_health", "1 if service is healthy, 0 if unhealthy", ["service"])
 # Connect to Docker daemon
-client = docker.from_env()
+# client = docker.from_env()
 # Scrape loop
 SCRAPE_INTERVAL = 3  # seconds
 
 
-def grafana_healthcheck():
+def grafana_healthcheck(service_name, port):
     try:
-        response = requests.get("http://grafana:3000/api/health", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/api/health", timeout=5)
         return response.status_code == 200 and response.json().get("database") == "ok"
     except Exception as e:
         logger.error(f"Grafana health check failed: {e}")
         return False
 
 
-def promtail_healthcheck():
+def promtail_healthcheck(service_name, port):
     try:
-        response = requests.get("http://promtail:9080/ready", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/ready", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Promtail health check failed: {e}")
         return False
 
 
-def loki_healthcheck():
+def loki_healthcheck(service_name, port):
     try:
-        response = requests.get("http://loki:3100/ready", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/ready", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Loki health check failed: {e}")
         return False
 
 
-def prometheus_healthcheck():
+def prometheus_healthcheck(service_name, port):
     try:
-        response = requests.get("http://prometheus:9090/-/ready", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/-/ready", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Prometheus health check failed: {e}")
         return False
 
 
-def mailhog_healthcheck():
+def mailhog_healthcheck(service_name, port):
     try:
-        response = requests.get("http://mailhog:8025/api/v2/messages", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/api/v2/messages", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Mailhog health check failed: {e}")
         return False
 
 
-def nginx_exporter_healthcheck():
+def nginx_exporter_healthcheck(service_name, port):
     try:
-        response = requests.get("http://nginx-exporter:9113/metrics", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/metrics", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Nginx exporter health check failed: {e}")
         return False
 
 
-def vector_healthcheck():
+def vector_healthcheck(service_name, port):
     return True
     try:
-        response = requests.get("http://vector:8686/metrics", timeout=5)
+        response = requests.get(f"http://{service_name}:{port}/metrics", timeout=5)
         return response.status_code == 200
     except Exception as e:
         logger.error(f"Vector health check failed: {e}")
@@ -86,49 +105,45 @@ def vector_healthcheck():
 # list of services where health is determined via HTTP
 HTTP_CHECK_SERVICES = {
     "tempo": tempo_healthcheck.check_tempo_comprehensive,
-    "docker-api-exporter": lambda: True,
+    "docker-api-exporter": lambda service_name, port: True,
     "grafana": grafana_healthcheck,
     # "promtail": promtail_healthcheck,
     "vector": vector_healthcheck,
-    "loki": loki_healthcheck,
+    "loki": lambda service_name, port: True,
     "prometheus": prometheus_healthcheck,
     "mailhog": mailhog_healthcheck,
     "nginx_exporter": nginx_exporter_healthcheck,
+    "nginx": lambda service_name, port: True,
+    "nginx-exporter": lambda service_name, port: True,
+    "api": lambda service_name, port: True,
+    "frontend": lambda service_name, port: True,
 }
 
 
 def update_metrics():
-    containers = client.containers.list(all=True)
-    for container in containers:
-        name = container.name
-        name_norm = "docker-api-exporter" if "docker-api-exporter" in container.name else name
-
+    # containers = client.containers.list(all=True)
+    parser = ComposeParser("docker-compose.yml")
+    for container_name, container in parser.extract_healthcheck_ports().items():
         # First, check if this service needs HTTP healthcheck
-        if name_norm in HTTP_CHECK_SERVICES:
-            method = HTTP_CHECK_SERVICES[name_norm]
+        if container_name in HTTP_CHECK_SERVICES:
+            method = HTTP_CHECK_SERVICES[container_name]
             try:
-                if method():
-                    SERVICE_HEALTH.labels(service=name).set(1)
-                    logger.info(f"HTTP check {name}: healthy")
+                port = (
+                    container["ports"][0].split(":")[-1]
+                    if isinstance(container["ports"], list) and container["ports"]
+                    else ""
+                )
+                if method(container_name, port):
+                    SERVICE_HEALTH.labels(service=container_name).set(1)
+                    logger.info(f"HTTP check {container_name}: healthy")
                 else:
-                    SERVICE_HEALTH.labels(service=name).set(0)
-                    logger.warning(f"HTTP check {name}: unhealthy")
+                    SERVICE_HEALTH.labels(service=container_name).set(0)
+                    logger.warning(f"HTTP check {container_name}: unhealthy")
             except Exception as e:
-                SERVICE_HEALTH.labels(service=name).set(0)
-                logger.error(f"HTTP check {name} failed: {e}")
+                SERVICE_HEALTH.labels(service=container_name).set(0)
+                logger.exception(f"HTTP check {container_name} failed: {e}")
             continue
-        try:
-            health = container.attrs.get("State", {}).get("Health", {})
-            status = health.get("Status", "unknown")
-            logger.info(f"Container {name} health status: {status}")
-            if status == "healthy":
-                SERVICE_HEALTH.labels(service=name).set(1)
-            else:
-                SERVICE_HEALTH.labels(service=name).set(0)
-        except Exception as e:
-            # If Docker API fails, mark unhealthy
-            SERVICE_HEALTH.labels(service=name).set(0)
-            logger.error(f"Error reading {name}: {e}")
+        logger.warning(f"No HTTP check defined for {container_name}")
 
 
 if __name__ == "__main__":
@@ -137,5 +152,6 @@ if __name__ == "__main__":
     logger.info("Docker API exporter running on port 9100...")
 
     while True:
+        time.sleep(3)  # initial delay to allow services to start
         update_metrics()
         time.sleep(SCRAPE_INTERVAL)
