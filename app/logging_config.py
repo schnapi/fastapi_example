@@ -18,31 +18,30 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        # Optional fields (if present)
-        if hasattr(record, "request_id"):
-            log_record["request_id"] = record.request_id
-        if hasattr(record, "method"):
-            log_record["method"] = record.method
-        if hasattr(record, "endpoint"):
-            log_record["endpoint"] = record.endpoint
-        if hasattr(record, "status_code"):
-            log_record["status_code"] = record.status_code
-        if hasattr(record, "duration"):
-            log_record["duration"] = record.duration
-        if hasattr(record, "client_addr"):
-            log_record["client_ip"] = record.client_addr
-        if hasattr(record, "country"):
-            log_record["country"] = record.country
-        if hasattr(record, "path"):
-            log_record["path"] = record.path
-        if hasattr(record, "http_version"):
-            log_record["http_version"] = record.http_version
-        return json.dumps(log_record)
+
+        for attr in [
+            "request_id",
+            "method",
+            "endpoint",
+            "status_code",
+            "duration",
+            "client_addr",
+            "country",
+            "path",
+            "http_version",
+        ]:
+            val = getattr(record, attr, None)
+            if val:
+                log_record[attr] = val
+
+        # IMPORTANT: ensure single JSON layer
+        return json.dumps(log_record, ensure_ascii=False)
 
 
-def setup_logging(for_docker=True):
+def setup_logging(
+    for_docker=True, level=logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
+):
     root_logger = logging.getLogger()
-    level = logging.INFO if os.getenv("ENV") == "dev" else logging.WARNING
     root_logger.setLevel(level)
 
     # # Formatter (structured, readable)

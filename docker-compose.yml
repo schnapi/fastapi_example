@@ -1,8 +1,9 @@
 x-logging: &default-logging
-  driver: local
+  driver: json-file
   options:
     max-size: "10m"
     max-file: "3"
+    labels: "com.docker.compose.service"
 
 x-healthcheck-curl: &healthcheck-curl
   interval: 30s
@@ -69,7 +70,7 @@ services:
     restart: unless-stopped
     networks:
       - internal
-    profiles: ["dev"]  # only run when profile 'dev' is enabled
+    profiles: ["dev"]
     command: npm run dev -- --host
     volumes:
       - ./frontend:/app
@@ -81,6 +82,7 @@ services:
     working_dir: /app
     healthcheck:
       test: "exit 0"
+    logging: *default-logging
 
   prometheus:
     image: prom/prometheus:latest
@@ -91,7 +93,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --log.level=warn
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - internal
     restart: unless-stopped
@@ -102,8 +104,8 @@ services:
     container_name: tempo
     command: ["-config.file=/etc/tempo.yaml"]
     ports:
-      - "3200:3200"   # HTTP frontend
-      - "4317:4317"   # gRPC OTLP receiver
+      - "127.0.0.1:3200:3200"
+      - "127.0.0.1:4317:4317"
     volumes:
       - ./tempo-data:/tempo-data
       - ./tempo-config.yaml:/etc/tempo.yaml
@@ -118,7 +120,7 @@ services:
     container_name: loki
     command: -config.file=/etc/loki-config.yaml
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
       - ./loki-config.yaml:/etc/loki-config.yaml
       - ./loki-data/wal:/loki/wal
@@ -130,15 +132,17 @@ services:
       - internal
     logging: *default-logging
 
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
+  vector:
+    image: timberio/vector:0.54.0-alpine
+    container_name: vector
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/lib/docker:/var/lib/docker:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - nginx_logs:/var/log/nginx:ro
-      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
-    command: -config.file=/etc/promtail/config.yaml
+      - vector-data:/var/lib/vector
+      - ./vector.toml:/etc/vector/vector.toml:ro
+    environment:
+      - VECTOR_REQUIRE_HEALTHY=true
+    command: ["--config", "/etc/vector/vector.toml"]
     networks:
       - internal
     depends_on:
@@ -154,7 +158,6 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SMTP_ENABLED=true
       - GF_SMTP_HOST=mailhog:1025
-      # - GF_SMTP_FROM_ADDRESS=alerts@example.com
       - GF_SMTP_FROM_NAME=Grafana
     container_name: grafana
     ports:
@@ -213,18 +216,21 @@ services:
       - nginx
     networks:
       - internal
+    logging: *default-logging
 
   docker-api-exporter:
     build:
       context: ./docker_api_exporter
-      dockerfile: Dockerfile.exporter  # includes docker_api_exporter.py
+      dockerfile: Dockerfile.exporter
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./app/logging_config.py:/app/logging_config.py
     ports:
       - "9100:9100"
     restart: always
     networks:
       - internal
+    logging: *default-logging
     
   mailhog:
     image: mailhog/mailhog
@@ -234,6 +240,7 @@ services:
       - "8025:8025"
     networks:
       - internal
+    logging: *default-logging
 
 volumes:
   pgdata:
@@ -245,6 +252,7 @@ volumes:
   grafana_data:
   loki_data:
   nginx_logs:
+  vector-data:
 
 networks:
   internal:

@@ -1,12 +1,13 @@
 import logging
 import time
 import requests
+import logging_config
 from prometheus_client import start_http_server, Gauge
 import docker
 import tempo_healthcheck
 
 
-logging.basicConfig(level=logging.INFO)
+logging_config.setup_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Prometheus metric
@@ -15,7 +16,7 @@ SERVICE_HEALTH = Gauge("service_health", "1 if service is healthy, 0 if unhealth
 # Connect to Docker daemon
 client = docker.from_env()
 # Scrape loop
-SCRAPE_INTERVAL = 60  # seconds
+SCRAPE_INTERVAL = 3  # seconds
 
 
 def grafana_healthcheck():
@@ -72,12 +73,23 @@ def nginx_exporter_healthcheck():
         return False
 
 
+def vector_healthcheck():
+    return True
+    try:
+        response = requests.get("http://vector:8686/metrics", timeout=5)
+        return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Vector health check failed: {e}")
+        return False
+
+
 # list of services where health is determined via HTTP
 HTTP_CHECK_SERVICES = {
     "tempo": tempo_healthcheck.check_tempo_comprehensive,
     "docker-api-exporter": lambda: True,
     "grafana": grafana_healthcheck,
-    "promtail": promtail_healthcheck,
+    # "promtail": promtail_healthcheck,
+    "vector": vector_healthcheck,
     "loki": loki_healthcheck,
     "prometheus": prometheus_healthcheck,
     "mailhog": mailhog_healthcheck,

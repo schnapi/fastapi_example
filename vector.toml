@@ -1,0 +1,169 @@
+############################
+# GLOBAL SETTINGS
+############################
+
+data_dir = "/var/lib/vector"
+
+############################
+# SOURCES
+############################
+
+[sources.docker_logs]
+type = "file"
+include = ["/var/lib/docker/containers/*/*.log"]
+read_from = "beginning"
+ignore_older_secs = 86400
+
+[sources.nginx]
+type = "file"
+include = ["/var/log/nginx/access.json"]
+read_from = "beginning"
+
+############################
+# TRANSFORMS
+############################
+
+[transforms.docker_parse]
+type = "remap"
+inputs = ["docker_logs"]
+
+source = '''
+parsed = parse_json(.message) ?? {}
+. = parsed
+
+# Extract service name from docker labels (captured by logging driver)
+service_name = ""
+
+if exists(.attrs) && is_object(.attrs) {
+  service_name = .attrs."com.docker.compose.service" || ""
+}
+
+# Set service from the extracted service_name
+if service_name != "" {
+  .service = service_name
+} else {
+  .service = "unknown"
+}
+
+# Parse timestamp
+if exists(.time) {
+  .timestamp = parse_timestamp!(.time, "%+")
+}
+
+# Drop noisy endpoints
+if is_string(.log) {
+  log_str = string!(.log)
+  if contains(log_str, "GET /metrics") || contains(log_str, "GET /health") {
+    abort
+  }
+}
+
+# Remove attrs - we don't need it anymore
+del(.attrs)
+'''
+
+[transforms.app_parse]
+type = "remap"
+inputs = ["docker_parse"]
+
+source = '''
+original_timestamp = .timestamp
+original_service = .service
+
+# Try to parse the log field as JSON if it looks like JSON
+if is_string(.log) {
+  log_str = string!(.log)
+  
+  # Check if log starts with { or [ (indicators of JSON)
+  if starts_with(log_str, "{") || starts_with(log_str, "[") {
+    # Try to parse as JSON
+    parsed_json = parse_json(log_str) ?? {}
+    
+    if is_object(parsed_json) {
+      # Store the log content before merging
+      message_content = ""
+      
+      # Find the first available message field and store its value
+      if exists(parsed_json.msg) && parsed_json.msg != "" {
+        message_content = string!(parsed_json.msg)
+      } else if exists(parsed_json.message) && parsed_json.message != "" {
+        message_content = string!(parsed_json.message)
+      } else if exists(parsed_json.text) && parsed_json.text != "" {
+        message_content = string!(parsed_json.text)
+      } else if exists(parsed_json.log) && parsed_json.log != "" {
+        message_content = string!(parsed_json.log)
+      }
+      
+      # Merge the parsed JSON fields into the root level
+      . = merge(., parsed_json) ?? .
+      
+      # Set log field with the message content
+      if message_content != "" {
+        .log = message_content
+      }
+      
+      # Delete all common message field names to avoid duplication
+      del(.msg)
+      del(.message)
+      del(.text)
+    }
+  }
+}
+
+# Restore critical fields in case they were overwritten
+.service = original_service
+if original_timestamp != null {
+  .timestamp = original_timestamp
+}
+
+# Set defaults if not present
+.level = .level || "info"
+.request_id = .request_id || "unknown"
+'''
+
+[transforms.nginx_parse]
+type = "remap"
+inputs = ["nginx"]
+
+source = '''
+. = parse_json!(.message)
+
+if exists(.timestamp) {
+  .timestamp = parse_timestamp!(.timestamp, "%+")
+}
+.service = "nginx"
+
+if is_string(.log) {
+  log_str = string!(.log)
+  if contains(log_str, "[error]") {
+    .level = "error"
+  } else if contains(log_str, "[warn]") {
+    .level = "warn"
+  } else {
+    .level = "info"
+  }
+}
+'''
+
+############################
+# SINK - LOKI
+############################
+
+[sinks.loki]
+type = "loki"
+inputs = ["app_parse", "nginx_parse"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+healthcheck.enabled = false
+
+labels.job = "vector"
+labels.service = "{{ service }}"
+
+############################
+# BUFFERING
+############################
+
+[sinks.loki.buffer]
+type = "disk"
+max_size = 268435488
+when_full = "block"
