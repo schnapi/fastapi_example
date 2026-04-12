@@ -6,8 +6,8 @@ x-logging: &default-logging
     labels: "com.docker.compose.service"
 
 x-healthcheck-curl: &healthcheck-curl
-  interval: 30s
-  timeout: 5s
+  interval: 60s
+  timeout: 3s
   retries: 3
   start_period: 30s
 
@@ -20,6 +20,8 @@ x-security-defaults: &security-defaults
 services:
   db:
     image: postgres:18.3
+    mem_limit: 768m
+    cpus: 1.0
     environment:
       PGOPTIONS: >
         -c log_min_messages=warning
@@ -44,6 +46,8 @@ services:
 
   api:
     build: .
+    mem_limit: 512m
+    cpus: 1.0
     restart: unless-stopped
     command: >
       sh -c "
@@ -52,7 +56,7 @@ services:
         sleep 2;
       done;
       gunicorn -k uvicorn.workers.UvicornWorker app.main:app
-      -w $((2 * $(nproc) + 1))
+      -w ${WEB_CONCURRENCY:-2}
       -b 0.0.0.0:8000
       --proxy-headers --forwarded-allow-ips=\"*\"
       --access-logfile - --error-logfile -"
@@ -79,7 +83,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
     restart: unless-stopped
     networks:
       - internal
@@ -98,7 +101,8 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
+    mem_limit: 512m
+    cpus: 1.0
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     command:
@@ -114,7 +118,8 @@ services:
 
   tempo:
     image: grafana/tempo:2.9.0
-    container_name: tempo
+    mem_limit: 512m
+    cpus: 0.75
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./tempo-data:/tempo-data
@@ -130,7 +135,8 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: loki
+    mem_limit: 1g
+    cpus: 1.5
     command: -config.file=/etc/loki-config.yaml
     volumes:
       - ./loki-config.yaml:/etc/loki-config.yaml
@@ -148,7 +154,8 @@ services:
 
   vector:
     image: timberio/vector:0.54.0-alpine
-    container_name: vector
+    mem_limit: 256m
+    cpus: 0.5
     volumes:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - nginx_logs:/var/log/nginx:ro
@@ -166,7 +173,8 @@ services:
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
+    mem_limit: 256m
+    cpus: 0.5
     environment:
       GF_LOG_LEVEL: "warn"
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
@@ -196,6 +204,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.nginx
+    mem_limit: 128m
+    cpus: 0.5
     restart: unless-stopped
     ports:
       - "80:80"
@@ -214,16 +224,15 @@ services:
       - internal
       - public
     healthcheck:
+      <<: *healthcheck-curl
       test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 60s
-      timeout: 5s
-      start_period: 15s
-      retries: 3
     logging: *default-logging
     <<: *security-defaults
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
+    mem_limit: 64m
+    cpus: 0.25
     command:
       - -nginx.scrape-uri=http://nginx:80/nginx_status
     depends_on:
@@ -240,6 +249,8 @@ services:
     build:
       context: ./docker_api_exporter
       dockerfile: Dockerfile.exporter
+    mem_limit: 128m
+    cpus: 0.25
     volumes:
       - ./docker-compose.yml:/app/docker-compose.yml:ro
       - ./app/logging_config.py:/app/logging_config.py:ro
@@ -255,7 +266,7 @@ services:
   mailhog:
     image: mailhog/mailhog
     platform: linux/amd64
-    container_name: mailhog
+    profiles: ["dev"]
     ports:
       - "8025:8025"
     networks:

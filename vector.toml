@@ -134,26 +134,34 @@ if .service == "db" && is_string(.log) {
 if is_string(.log) && !exists(.level) {
   log_str = downcase(string!(.log))
   
-  # Check for level=error, level=warn, level=info, level=debug (case insensitive)
-  if contains(log_str, "level=error") || contains(log_str, "level=fatal") || contains(log_str, " error ") || contains(log_str, "\"level\":\"error\"") || contains(log_str, "\"level\":\"fatal\"") {
+  # Check for common log prefixes first
+  if starts_with(log_str, "error:") || starts_with(log_str, "fatal:") {
     .level = "error"
-  } else if contains(log_str, "level=warn") || contains(log_str, "level=warning") || contains(log_str, " warn ") || contains(log_str, " warning ") || contains(log_str, "\"level\":\"warn\"") || contains(log_str, "\"level\":\"warning\"") {
+  } else if starts_with(log_str, "warning:") || starts_with(log_str, "warn:") {
     .level = "warn"
-  } else if contains(log_str, "level=info") || contains(log_str, " info ") || contains(log_str, "\"level\":\"info\"") {
+  } else if starts_with(log_str, "info:") || starts_with(log_str, "hint:") || starts_with(log_str, "notice:") {
     .level = "info"
-  } else if contains(log_str, "level=debug") || contains(log_str, " debug ") || contains(log_str, "\"level\":\"debug\"") {
+  } else if starts_with(log_str, "debug:") {
     .level = "debug"
+  }
+  
+  # Check for level=error, level=warn, level=info, level=debug (case insensitive)
+  if !exists(.level) {
+    if contains(log_str, "level=error") || contains(log_str, "level=fatal") || contains(log_str, " error ") || contains(log_str, "\"level\":\"error\"") || contains(log_str, "\"level\":\"fatal\"") {
+      .level = "error"
+    } else if contains(log_str, "level=warn") || contains(log_str, "level=warning") || contains(log_str, " warn ") || contains(log_str, " warning ") || contains(log_str, "\"level\":\"warn\"") || contains(log_str, "\"level\":\"warning\"") {
+      .level = "warn"
+    } else if contains(log_str, "level=info") || contains(log_str, " info ") || contains(log_str, "\"level\":\"info\"") {
+      .level = "info"
+    } else if contains(log_str, "level=debug") || contains(log_str, " debug ") || contains(log_str, "\"level\":\"debug\"") {
+      .level = "debug"
+    }
   }
 }
 
 # Set defaults if not present
 if !exists(.level) {
-  # If stream is stderr, it's likely an error
-  if exists(.stream) && .stream == "stderr" {
-    .level = "error"
-  } else {
-    .level = "info"
-  }
+  .level = "info"
 }
 .request_id = .request_id || "unknown"
 '''
