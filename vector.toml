@@ -110,6 +110,14 @@ if is_string(.log) {
   }
 }
 
+# delete timestamp aliases that shouldn't be in the final output
+del(.ts)
+del(.time)
+if .request_id == "unknown" || .request_id == null {
+  del(.request_id)
+}
+del(.stream)
+
 # Restore critical fields in case they were overwritten
 .service = original_service
 if original_timestamp != null {
@@ -163,7 +171,6 @@ if is_string(.log) && !exists(.level) {
 if !exists(.level) {
   .level = "info"
 }
-.request_id = .request_id || "unknown"
 '''
 
 [transforms.nginx_parse]

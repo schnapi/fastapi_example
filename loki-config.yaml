@@ -64,3 +64,14 @@ ruler:
     local:
       directory: /loki/rules
   poll_interval: 30s
+
+frontend:
+  log_queries_longer_than: 5s
+
+query_range:
+  cache_results: true # enables caching for range queries
+  results_cache:
+    cache:
+      embedded_cache: # defines where cache lives -> in memory
+        enabled: true
+        max_size_mb: 100
