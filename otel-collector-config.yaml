@@ -1,4 +1,5 @@
 receivers:
+  # 1. Receives traces, metrics, and logs from FastAPI (api)
   otlp:
     protocols:
       grpc:
@@ -6,31 +7,72 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # 2. Scrapes nginx-exporter & OpenObserve self-metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "nginx"
+          scrape_interval: 15s
+          static_configs:
+            - targets: ["nginx-exporter:9113"]
+        - job_name: "openobserve"
+          scrape_interval: 30s
+          static_configs:
+            - targets: ["openobserve:5080"]
+
+  # 3. Tails Docker container json-file logs (db, api, nginx, etc.)
+  filelog/containers:
+    include:
+      - /var/lib/docker/containers/*/*-json.log
+    include_file_path: true
+    start_at: end
+    operators:
+      - type: container
+        add_metadata_from_filepath: false
+      - type: json_parser
+        if: 'body matches "^\\{"'
+        parse_from: body
+        parse_to: attributes
+        on_error: send
+
+  # 4. Tails Nginx access/error log files
+  filelog/nginx:
+    include:
+      - /var/log/nginx/*.log
+    start_at: end
+    resource:
+      service.name: nginx
+
 processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
   batch:
-    timeout: 10s
-    send_batch_size: 1024
+    send_batch_size: 1000
+    timeout: 5s
 
 exporters:
-  debug:
-    verbosity: basic
-  otlp_grpc/tempo:
-    endpoint: tempo:4317
-    tls:
-      insecure: true
+  otlphttp/openobserve:
+    endpoint: http://openobserve:5080/api/default
+    headers:
+      Authorization: "Basic ${env:O2_AUTH_TOKEN}"
+      stream-name: default
 
 service:
   telemetry:
     logs:
-      level: warn # Only warn, error, fatal
-      encoding: json
+      level: warn
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp_grpc/tempo, debug]
-
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/openobserve]
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/openobserve]
     logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [debug]
+      receivers: [otlp, filelog/containers, filelog/nginx]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/openobserve]

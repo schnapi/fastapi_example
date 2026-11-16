@@ -6,6 +6,12 @@ import json
 from logging.handlers import QueueHandler, QueueListener
 import traceback
 
+from opentelemetry import _logs
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.resources import Resource
+
 # Create a global log queue
 log_queue = queue.Queue(-1)
 
@@ -69,6 +75,25 @@ def setup_logging(
     root_logger.handlers.clear()
     if for_docker:
         root_logger.addHandler(console_handler)
+
+        # Export Python log records over OTLP/HTTP to the collector.
+        logs_endpoint = os.getenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT")
+        if not logs_endpoint:
+            otlp_endpoint = os.getenv(
+                "OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318"
+            ).rstrip("/")
+            logs_endpoint = f"{otlp_endpoint}/v1/logs"
+
+        logger_provider = LoggerProvider(
+            resource=Resource.create(
+                {"service.name": os.getenv("OTEL_SERVICE_NAME", "api")}
+            )
+        )
+        logger_provider.add_log_record_processor(
+            BatchLogRecordProcessor(OTLPLogExporter(endpoint=logs_endpoint))
+        )
+        _logs.set_logger_provider(logger_provider)
+        root_logger.addHandler(LoggingHandler(level=level, logger_provider=logger_provider))
         return
 
     # Queue handler (non-blocking)

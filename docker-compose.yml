@@ -99,103 +99,6 @@ services:
     logging: *default-logging
     <<: *security-defaults
 
-  prometheus:
-    image: prom/prometheus:latest
-    mem_limit: 512m
-    cpus: 1.0
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --log.level=warn
-    networks:
-      - observability
-    restart: unless-stopped
-    logging: *default-logging
-    <<: *security-defaults
-    cap_drop:
-      - ALL
-
-  tempo:
-    image: grafana/tempo:2.9.0
-    mem_limit: 512m
-    cpus: 0.75
-    command: ["-config.file=/etc/tempo.yaml"]
-    volumes:
-      - ./tempo-data:/tempo-data
-      - ./tempo-config.yaml:/etc/tempo.yaml
-    networks:
-      - observability
-    depends_on:
-      - loki
-    logging: *default-logging
-    <<: *security-defaults
-    cap_drop:
-      - ALL
-
-  loki:
-    image: grafana/loki:latest
-    mem_limit: 1g
-    cpus: 1.5
-    command: -config.file=/etc/loki-config.yaml
-    volumes:
-      - ./loki-config.yaml:/etc/loki-config.yaml
-      - ./loki-data/wal:/loki/wal
-      - ./loki-data/chunks:/tmp/loki/chunks
-      - ./loki-data/cache:/tmp/loki/cache
-      - ./loki-data/index:/tmp/loki/index
-      - ./loki-data/compactor:/tmp/loki/compactor
-    networks:
-      - observability
-    logging: *default-logging
-    <<: *security-defaults
-    cap_drop:
-      - ALL
-
-  vector:
-    image: timberio/vector:0.54.0-alpine
-    mem_limit: 256m
-    cpus: 0.5
-    volumes:
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - nginx_logs:/var/log/nginx:ro
-      - vector-data:/var/lib/vector
-      - ./vector.toml:/etc/vector/vector.toml:ro
-    environment:
-      - VECTOR_REQUIRE_HEALTHY=true
-    command: ["--config", "/etc/vector/vector.toml"]
-    networks:
-      - observability
-    depends_on:
-      - loki
-    logging: *default-logging
-    <<: *security-defaults
-
-  grafana:
-    image: grafana/grafana:latest
-    mem_limit: 256m
-    cpus: 0.5
-    environment:
-      GF_LOG_LEVEL: "warn"
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
-    ports:
-      - "127.0.0.1:3000:3000"
-    depends_on:
-      - tempo
-      - loki
-      - prometheus
-    volumes:
-      - ./grafana.ini:/etc/grafana/grafana.ini
-      - grafana_data:/var/lib/grafana
-      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./provisioning/jsondashboards:/var/lib/grafana/dashboards
-      - ./provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ./provisioning/alerting:/etc/grafana/provisioning/alerting
-    networks:
-      - internal
-      - observability
-    logging: *default-logging
-    <<: *security-defaults
 
   nginx:
     build:
@@ -242,32 +145,42 @@ services:
     cap_drop:
       - ALL
 
-  docker-api-exporter:
-    build:
-      context: ./docker_api_exporter
-      dockerfile: Dockerfile.exporter
-    mem_limit: 128m
-    cpus: 0.25
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    ports:
+      - "5080:5080"
+    environment:
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-admin@example.com}
+      - ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD:-ChangeMe123!}
+      - ZO_DATA_DIR=/data
     volumes:
-      - ./docker-compose.yml:/app/docker-compose.yml:ro
-      - ./app/logging_config.py:/app/logging_config.py:ro
-    restart: always
+      - o2_data:/data
     networks:
       - observability
     logging: *default-logging
     <<: *security-defaults
-    cap_drop:
-      - ALL
-    read_only: true
 
-  mailhog:
-    image: mailhog/mailhog
-    platform: linux/amd64
-    profiles: ["dev"]
-    ports:
-      - "8025:8025"
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      - O2_AUTH_TOKEN=${O2_AUTH_TOKEN}
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - nginx_logs:/var/log/nginx:ro
+      - logs_volume:/app/logs:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - openobserve
     networks:
-      - internal
       - observability
     logging: *default-logging
     <<: *security-defaults
@@ -279,9 +192,8 @@ volumes:
   logs_volume:
   frontend_dist:
   frontend_node_modules:
-  grafana_data:
   nginx_logs:
-  vector-data:
+  o2_data:
 
 networks:
   internal:
